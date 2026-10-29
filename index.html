@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#111827">
+  <meta name="description" content="دریافت لینک دانلود ویدیوهای عمومی آپارات">
+  <title>دانلود ویدیو از آپارات</title>
+  <style>
+    :root{color-scheme:dark;--bg:#0b1020;--panel:#141c2f;--line:#2b3650;--text:#f3f5fb;--muted:#aab5ca;--accent:#ff6b35;--accent2:#ff8b60}
+    *{box-sizing:border-box}body{margin:0;font-family:Tahoma,Arial,sans-serif;background:radial-gradient(ellipse at top,#192442 0,#0b1020 55%);color:var(--text);min-height:100vh}
+    .wrap{width:min(760px,92%);margin:0 auto;padding:42px 0 28px}.brand{display:flex;align-items:center;gap:12px;margin-bottom:30px}.logo{width:48px;height:48px;border-radius:15px;background:var(--accent);display:grid;place-items:center;font-size:24px;font-weight:bold;color:white;box-shadow:0 8px 25px #ff6b3530}
+    h1{font-size:clamp(25px,5vw,38px);margin:0 0 10px;line-height:1.5}.lead{color:var(--muted);line-height:2;margin:0 0 25px}
+    .card{background:#141c2fee;border:1px solid var(--line);border-radius:22px;padding:22px;box-shadow:0 20px 70px #0003}
+    label{display:block;font-size:14px;margin-bottom:10px;color:#d9e1f1}.inputrow{display:flex;gap:10px}
+    input{flex:1;min-width:0;background:#0b1223;border:1px solid #34415e;border-radius:12px;padding:15px;color:white;font:inherit;direction:ltr;text-align:left;outline:none}
+    input:focus{border-color:var(--accent);box-shadow:0 0 0 3px #ff6b3520}
+    button{border:0;border-radius:12px;background:var(--accent);color:white;font:inherit;font-weight:bold;padding:0 20px;cursor:pointer;min-height:50px}
+    button:hover{background:var(--accent2)}button:disabled{opacity:.6;cursor:wait}
+    .hint{font-size:12px;color:var(--muted);line-height:1.9;margin:12px 0 0}.status{margin-top:16px;line-height:1.9;font-size:14px;white-space:pre-wrap}
+    .result{display:none;margin-top:18px;border-top:1px solid var(--line);padding-top:18px}.meta{display:flex;gap:15px;align-items:flex-start}.thumb{width:145px;aspect-ratio:16/9;object-fit:cover;border-radius:12px;background:#080c16}.title{font-weight:bold;line-height:1.8;overflow-wrap:anywhere}.uploader{color:var(--muted);font-size:12px;margin-top:7px}
+    .qualities{display:grid;grid-template-columns:repeat(auto-fit,minmax(125px,1fr));gap:10px;margin-top:18px}.qbtn{padding:12px 10px;min-height:46px;border:1px solid #3a4764;background:#202b43;font-size:13px}.qbtn:hover{background:#2b3956}
+    .notice{border:1px solid #65502c;background:#2a2418;color:#f4d9a3;border-radius:13px;padding:13px;margin-top:18px;font-size:12px;line-height:2}
+    .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:18px 0 0}.step{border:1px solid #26324b;border-radius:13px;padding:13px;color:var(--muted);font-size:12px;line-height:1.9}.step b{display:block;color:#f3f5fb;font-size:13px;margin-bottom:4px}
+    footer{text-align:center;color:#7f8ca6;font-size:12px;line-height:2;margin-top:24px}a{color:#ffb092}
+    @media(max-width:560px){.wrap{padding-top:25px}.card{padding:16px}.inputrow{flex-direction:column}button#resolve{width:100%}.meta{flex-direction:column}.thumb{width:100%;max-height:220px}.steps{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <div class="brand"><div class="logo">↓</div><div><strong>دانلودر آپارات</strong><div style="color:var(--muted);font-size:12px;margin-top:5px">برای ویدیوهای عمومی و قابل‌دسترسی</div></div></div>
+    <h1>دانلود ویدیو از آپارات</h1>
+    <p class="lead">لینک ویدیوی عمومی آپارات را وارد کن، کیفیت‌های قابل‌دسترسی را ببین و لینک دانلود را باز کن.</p>
+    <section class="card">
+      <form id="form">
+        <label for="url">لینک ویدیو</label>
+        <div class="inputrow">
+          <input id="url" name="url" type="url" required placeholder="https://www.aparat.com/v/..." autocomplete="url">
+          <button id="resolve" type="submit">دریافت لینک‌ها</button>
+        </div>
+        <p class="hint">فقط لینک یک ویدیو را وارد کن؛ لینک کانال یا فهرست پخش پشتیبانی نمی‌شود.</p>
+      </form>
+      <div id="status" class="status" role="status" aria-live="polite"></div>
+      <div id="result" class="result">
+        <div class="meta">
+          <img id="thumb" class="thumb" alt="تصویر بندانگشتی ویدیو" hidden>
+          <div><div id="title" class="title"></div><div id="uploader" class="uploader"></div></div>
+        </div>
+        <div id="qualities" class="qualities"></div>
+        <div class="hint">با انتخاب کیفیت، لینک فایل آپارات در صفحه جدید باز می‌شود. اگر دانلود خودکار آغاز نشد، از منوی مرورگر گزینه «دانلود» یا «ذخیره ویدیو» را انتخاب کن.</div>
+      </div>
+    </section>
+    <div class="steps">
+      <div class="step"><b>۱. لینک را کپی کن</b>آدرس یک ویدیوی عمومی آپارات را بردار.</div>
+      <div class="step"><b>۲. لینک‌ها را دریافت کن</b>سایت فقط لینک‌های قابل‌دسترسی را بررسی می‌کند.</div>
+      <div class="step"><b>۳. کیفیت را انتخاب کن</b>یکی از کیفیت‌های موجود را باز کن.</div>
+    </div>
+    <div class="notice">این ابزار محدودیت‌های دسترسی، ورود، محتوای پولی یا DRM را دور نمی‌زند. عمومی‌بودن صفحه تضمین نمی‌کند که فایل مستقیم برای همه قابل‌دسترسی باشد. فقط محتوایی را دانلود کن که اجازه ذخیره‌کردن آن را داری.</div>
+    <footer>این پروژه مستقل است و وابستگی رسمی به آپارات ندارد. در صورت تغییر API آپارات، ممکن است نیاز به به‌روزرسانی داشته باشد.</footer>
+  </main>
+<script>
+const form = document.getElementById('form');
+const urlInput = document.getElementById('url');
+const button = document.getElementById('resolve');
+const statusEl = document.getElementById('status');
+const result = document.getElementById('result');
+const qualities = document.getElementById('qualities');
+const titleEl = document.getElementById('title');
+const uploaderEl = document.getElementById('uploader');
+const thumbEl = document.getElementById('thumb');
+
+function setStatus(message, error=false) {
+  statusEl.textContent = message;
+  statusEl.style.color = error ? '#ff9d9d' : '#b8c6df';
+}
+form.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  result.style.display = 'none';
+  qualities.replaceChildren();
+  thumbEl.hidden = true;
+  const videoUrl = urlInput.value.trim();
+  button.disabled = true;
+  button.textContent = 'در حال بررسی…';
+  setStatus('در حال بررسی لینک و دریافت کیفیت‌های قابل‌دسترسی هستیم…');
+  try {
+    const response = await fetch('/api/resolve?url=' + encodeURIComponent(videoUrl), {
+      headers: { 'Accept': 'application/json' }
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error || 'دریافت اطلاعات ویدیو ناموفق بود.');
+    if (!Array.isArray(data.downloads) || data.downloads.length === 0) {
+      throw new Error('لینک دانلود مستقیمی پیدا نشد. ممکن است آپارات دسترسی را محدود کرده باشد یا API تغییر کرده باشد.');
+    }
+    titleEl.textContent = data.title || 'ویدیوی آپارات';
+    uploaderEl.textContent = data.uploader ? ('بارگذار: ' + data.uploader) : '';
+    if (data.thumbnail) {
+      thumbEl.src = data.thumbnail;
+      thumbEl.hidden = false;
+    }
+    data.downloads.forEach((item) => {
+      const link = document.createElement('a');
+      link.href = item.url;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.style.textDecoration = 'none';
+      const q = document.createElement('button');
+      q.type = 'button';
+      q.className = 'qbtn';
+      q.textContent = 'دانلود ' + (item.quality || 'ویدیو');
+      link.appendChild(q);
+      qualities.appendChild(link);
+    });
+    result.style.display = 'block';
+    setStatus('لینک‌ها دریافت شد. یکی از کیفیت‌های موجود را انتخاب کن.');
+  } catch (err) {
+    setStatus(err.message || 'خطای نامشخص رخ داد.', true);
+  } finally {
+    button.disabled = false;
+    button.textContent = 'دریافت لینک‌ها';
+  }
+});
+</script>
+</body>
+</html>
