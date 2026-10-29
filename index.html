@@ -14,179 +14,38 @@
   <meta name="apple-mobile-web-app-title" content="VidPik">
 
   <style>
-    :root {
-      color-scheme: dark;
-      --bg: #0b1020;
-      --panel: #141c2f;
-      --line: #2b3650;
-      --text: #f3f5fb;
-      --muted: #aab5ca;
-      --accent: #ff7043;
-    }
-
-    * { box-sizing: border-box; }
-
-    body {
-      margin: 0;
-      font-family: Tahoma, Arial, sans-serif;
-      background: radial-gradient(ellipse at top, #1a2545, var(--bg) 65%);
-      color: var(--text);
-      min-height: 100vh;
-    }
-
-    .wrap {
-      width: min(760px, 92%);
-      margin: auto;
-      padding: 28px 0;
-    }
-
-    .brand {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      margin-bottom: 30px;
-    }
-
-    .logo {
-      width: 52px;
-      height: 52px;
-      border-radius: 16px;
-      background: var(--accent);
-      display: grid;
-      place-items: center;
-      font-size: 28px;
-    }
-
-    .brand-name { font-size: 24px; font-weight: 900; }
-    .menu-wrap { position:relative; margin-right:auto; }
-    .menu-button { padding:10px 13px; background:#202b43; border:1px solid var(--line); }
-    .menu-panel { display:none; position:absolute; z-index:50; top:calc(100% + 8px); right:0; width:210px; padding:8px; border:1px solid var(--line); border-radius:13px; background:#111a2d; box-shadow:0 12px 30px #0008; }
-    .menu-panel.open { display:grid; gap:4px; }
-    .menu-panel a { padding:11px; color:var(--text); text-decoration:none; border-radius:8px; }
-    .menu-panel a:hover { background:#202b43; }
-    .search-results { display:grid; gap:10px; margin-top:14px; }
-    .search-item { display:flex; align-items:center; gap:12px; padding:10px; border:1px solid var(--line); border-radius:12px; background:#0b1223; }
-    .search-item img { width:100px; aspect-ratio:16/9; object-fit:cover; border-radius:8px; }
-    .search-item button { margin-top:8px; padding:9px 12px; }
-    .ad-slot { display:none; margin-top:15px; padding:13px; border:1px dashed #65502c; border-radius:12px; background:#2a2418; color:#f4d9a3; white-space:pre-wrap; overflow-wrap:anywhere; line-height:1.9; }
-    .ad-slot.visible { display:block; }
-    .brand { flex-wrap: wrap; }
-    .install-top { margin-right: auto; padding: 10px 14px; white-space: nowrap; }
-    .brand-name span { color: var(--accent); }
-    .tagline, .muted { color: var(--muted); }
-
-    h1 {
-      font-size: clamp(27px, 5vw, 38px);
-      line-height: 1.6;
-      margin-bottom: 8px;
-    }
-
-    .lead { line-height: 2.1; color: var(--muted); }
-
-    .card {
-      background: var(--panel);
-      border: 1px solid var(--line);
-      border-radius: 22px;
-      padding: 20px;
-      margin-top: 22px;
-    }
-
-    label { display: block; margin-bottom: 10px; }
-
-    .input-row { display: flex; gap: 10px; }
-
-    input {
-      flex: 1;
-      min-width: 0;
-      padding: 15px;
-      border-radius: 12px;
-      border: 1px solid #34415e;
-      background: #0b1223;
-      color: white;
-      font: inherit;
-      direction: ltr;
-      text-align: left;
-    }
-
-    button {
-      border: 0;
-      border-radius: 12px;
-      background: var(--accent);
-      color: white;
-      padding: 13px 18px;
-      font: inherit;
-      font-weight: bold;
-      cursor: pointer;
-    }
-
-    button:disabled { opacity: .6; }
-
-    .status { margin-top: 14px; line-height: 2; }
-
-    #result {
-      display: none;
-      margin-top: 20px;
-      padding-top: 18px;
-      border-top: 1px solid var(--line);
-    }
-
-    .video-title {
-      font-size: 17px;
-      font-weight: bold;
-      line-height: 1.9;
-      overflow-wrap: anywhere;
-    }
-
-    video {
-      width: 100%;
-      max-height: 440px;
-      aspect-ratio: 16 / 9;
-      background: #050812;
-      border-radius: 14px;
-      margin-top: 16px;
-    }
-
-    .qualities {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 10px;
-      margin-top: 16px;
-    }
-
-    .qualities a { text-decoration: none; }
-    .qualities button { width: 100%; background: #202b43; border: 1px solid #3a4764; }
-    .qualities button:hover { background: #303d5b; }
-
-    .app-promo { margin-top: 22px; padding: 22px; border: 1px solid #ff7043; border-radius: 22px; background: linear-gradient(135deg, #202943, #151b2d 60%, #332018); }
-    .app-promo h2 { margin: 0 0 8px; font-size: 23px; }
-    .app-promo p { color: var(--muted); line-height: 2; margin: 0 0 15px; }
-    .install-actions { display: flex; gap: 10px; flex-wrap: wrap; }
-    .install-actions button { background: linear-gradient(135deg, #ff7b35, #f04438); }
-    .install-note { display:block; margin-top:10px; font-size:12px; color:var(--muted); line-height:1.8; }
-
-    .promo {
-      margin-top: 20px;
-      border: 1px solid #65502c;
-      background: #2a2418;
-      color: #f4d9a3;
-      border-radius: 16px;
-      padding: 17px;
-      line-height: 2.1;
-    }
-
-    footer {
-      text-align: center;
-      margin-top: 25px;
-      color: #7f8ca6;
-      font-size: 12px;
-      line-height: 2;
-    }
-
-    @media (max-width: 520px) {
-      .input-row { flex-direction: column; }
-      .input-row button { width: 100%; }
-      .card { padding: 15px; }
-    }
+    :root{color-scheme:light;--bg:#f7f9fc;--panel:#fff;--line:#e5e9f2;--text:#182230;--muted:#667085;--accent:#3867f4;--accent2:#6847ed;--soft:#eef3ff}
+    *{box-sizing:border-box}
+    html{scroll-behavior:smooth}
+    body{margin:0;font-family:Tahoma,Arial,sans-serif;background:linear-gradient(180deg,#f4f7ff 0,#fff 330px);color:var(--text);min-height:100vh}
+    .wrap{width:min(900px,92%);margin:auto;padding:20px 0 34px}
+    .brand{display:flex;align-items:center;gap:12px;margin-bottom:32px;padding:12px 14px;background:#ffffffd9;border:1px solid #e8ecf6;border-radius:20px;box-shadow:0 5px 24px #22335b0a;flex-wrap:wrap;position:relative}
+    .logo{width:46px;height:46px;flex:0 0 46px;border-radius:15px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:grid;place-items:center;color:white;font-size:23px;box-shadow:0 7px 15px #3867f42b}
+    .brand-name{font-size:23px;font-weight:900;letter-spacing:-.6px}.brand-name span{color:var(--accent)}
+    .tagline,.muted{color:var(--muted)}.tagline{font-size:12px;margin-top:4px}
+    .install-top{margin-right:auto;padding:10px 13px;white-space:nowrap;background:#edf2ff;color:#284dc2;border:1px solid #dbe4ff}
+    h1{font-size:clamp(26px,5vw,39px);line-height:1.55;text-align:center;letter-spacing:-.7px;margin:28px 0 8px}
+    .lead{line-height:2;text-align:center;color:var(--muted);max-width:680px;margin:0 auto 24px}
+    .card{background:var(--panel);border:1px solid var(--line);border-radius:24px;padding:clamp(16px,4vw,28px);margin-top:20px;box-shadow:0 12px 38px #182b5510}
+    label{display:block;margin-bottom:10px;font-weight:700}
+    .input-row{display:flex;gap:10px}
+    input{flex:1;min-width:0;padding:16px 18px;border-radius:16px;border:1px solid #dce3ef;background:#fbfcff;color:#182230;font:inherit;direction:ltr;text-align:left;outline:none;transition:.2s}
+    input:focus{border-color:#7895ff;box-shadow:0 0 0 4px #3867f414}
+    button{border:0;border-radius:14px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:white;padding:13px 18px;font:inherit;font-weight:700;cursor:pointer;box-shadow:0 6px 15px #3867f423;transition:transform .15s,filter .15s}
+    button:hover{filter:brightness(1.04);transform:translateY(-1px)}button:disabled{opacity:.6;cursor:wait;transform:none}
+    .status{margin-top:14px;line-height:2;color:var(--muted)}
+    #result{display:none;margin-top:20px;padding-top:18px;border-top:1px solid var(--line)}
+    .video-title{font-size:17px;font-weight:bold;line-height:1.9;overflow-wrap:anywhere}
+    video{width:100%;max-height:440px;aspect-ratio:16/9;background:#101828;border-radius:17px;margin-top:16px}
+    .qualities{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:16px}
+    .qualities a{text-decoration:none}.qualities button{width:100%;background:#eef3ff;color:#2447b8;border:1px solid #dce5ff;box-shadow:none}.qualities button:hover{background:#e1eaff}
+    .app-promo{margin-top:22px;padding:22px;border:1px solid #dce5ff;border-radius:24px;background:linear-gradient(135deg,#f0f4ff,#fff 70%);box-shadow:0 10px 30px #22335b08}
+    .app-promo h2{margin:0 0 8px;font-size:22px}.app-promo p{color:var(--muted);line-height:2;margin:0 0 15px}.install-actions{display:flex;gap:10px;flex-wrap:wrap}.install-actions button{background:linear-gradient(135deg,var(--accent),var(--accent2))}.install-note{display:block;margin-top:10px;font-size:12px;color:var(--muted);line-height:1.8}
+    .promo{margin-top:20px;border:1px solid #dce5ff;background:#f5f7ff;color:#33446c;border-radius:18px;padding:17px;line-height:2.1}
+    footer{text-align:center;margin-top:25px;color:#8791a5;font-size:12px;line-height:2}
+    .menu-wrap{position:relative;margin-right:4px}.menu-button{padding:10px 13px;background:#fff;color:#344054;border:1px solid var(--line);box-shadow:none}.menu-panel{display:none;position:absolute;z-index:9999;top:calc(100% + 8px);right:0;width:210px;padding:8px;border:1px solid var(--line);border-radius:16px;background:#fff;box-shadow:0 15px 40px #182b5520}.menu-panel.open{display:grid;gap:4px}.menu-panel a{display:block;padding:12px;border-radius:10px;color:var(--text);text-decoration:none;font-size:14px}.menu-panel a:hover{background:#f1f4ff;color:#2447b8}
+    .search-hint{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin:16px 0 4px}.search-hint span{font-size:12px;color:#596782;background:#f0f4ff;border:1px solid #e3eaff;border-radius:99px;padding:7px 11px}
+    @media(max-width:560px){.wrap{width:min(100% - 24px,900px);padding-top:12px}.brand{gap:9px;padding:10px;border-radius:17px;margin-bottom:24px}.brand-name{font-size:21px}.install-top{padding:9px 10px;font-size:12px}.input-row{flex-direction:column}.input-row button{width:100%}.card{padding:16px;border-radius:20px}.qualities{grid-template-columns:1fr}.app-promo{padding:18px}.menu-panel{right:auto;left:0}}
   </style>
 </head>
 
@@ -201,37 +60,21 @@
     </div>
     <button class="install-top" id="installTop" type="button">⬇ نصب اپلیکیشن</button>
     <div class="menu-wrap">
-      <button class="menu-button" id="menuButton" type="button" aria-expanded="false">☰ منو</button>
+      <button class="menu-button" id="menuButton" type="button" aria-expanded="false" aria-controls="menuPanel">☰ منو</button>
       <nav class="menu-panel" id="menuPanel" aria-label="منوی اصلی">
-        <a href="#searchSection">🔎 جست‌وجوی ویدیو</a>
-        <a href="#videoSection">⬇ دریافت از لینک</a>
+        <a href="#videoSection">🔎 جست‌وجو / دریافت ویدیو</a>
         <a href="#download-app">📱 نصب اپلیکیشن</a>
         <a href="/admin.html">⚙ پنل مدیریت</a>
       </nav>
     </div>
   </header>
 
-  <h1>ویدیوهایت را آسان دانلود کن!</h1>
+  <h1>ویدیوی موردنظرت را پیدا کن</h1>
 
   <p class="lead">
-    🎬 هر ویدیوی عمومی که تماشای آن یا دریافت فایلش برایت دردسر شده،
-    لینک آن را اینجا وارد کن! ویدیو را داخل خود VidPik تماشا کن
-    و اگر دانلود مستقیم در دسترس بود، کیفیت دلخواهت را انتخاب کن.
+    با طراحی ساده و سریع VidPik، لینک ویدیوی عمومی را وارد کن، آن را داخل سایت تماشا کن و کیفیت‌های قابل‌دسترسی را دریافت کن.
   </p>
-
-  <section class="card" id="searchSection">
-    <h2 style="margin-top:0">🔎 جست‌وجوی ویدیو</h2>
-    <p class="muted">عنوان یا کلمهٔ کلیدی ویدیوی عمومی آپارات را جست‌وجو کن.</p>
-    <form id="searchForm">
-      <div class="input-row">
-        <input id="searchQuery" type="search" maxlength="120" placeholder="مثلاً آموزش، موسیقی، فوتبال" required style="direction:rtl;text-align:right">
-        <button id="searchBtn" type="submit">جست‌وجو</button>
-      </div>
-    </form>
-    <div id="searchStatus" class="status" role="status" aria-live="polite"></div>
-    <div id="searchResults" class="search-results"></div>
-  </section>
-  <div id="homeAd" class="ad-slot" aria-label="تبلیغ صفحهٔ اصلی"></div>
+  <div class="search-hint"><span>⚡ سریع و ساده</span><span>▶ پخش آنلاین</span><span>⬇ انتخاب کیفیت</span></div>
 
   <section class="card" id="videoSection">
     <form id="videoForm">
@@ -250,16 +93,10 @@
     </form>
 
     <div id="status" class="status" role="status" aria-live="polite"></div>
-    <div id="beforeDownloadAd" class="ad-slot" aria-label="تبلیغ پیش از دانلود"></div>
 
     <section id="result">
       <div id="videoTitle" class="video-title"></div>
       <div id="uploader" class="muted"></div>
-      <div id="duringWatchAd" class="ad-slot" aria-label="تبلیغ هنگام تماشا"></div>
-      <label for="playQuality" style="margin-top:14px">کیفیت پخش آنلاین</label>
-      <select id="playQuality" style="width:100%;padding:12px;border-radius:10px;background:#0b1223;color:white;border:1px solid #34415e;font:inherit">
-        <option value="">انتخاب کیفیت</option>
-      </select>
 
       <video id="videoPlayer"
         controls
@@ -313,7 +150,6 @@ const qualities = document.getElementById("qualities");
 let installPrompt = null;
 const installButtons = [document.getElementById("installApp"), document.getElementById("installTop")];
 const installNote = document.getElementById("installNote");
-
 const menuButton = document.getElementById("menuButton");
 const menuPanel = document.getElementById("menuPanel");
 menuButton.addEventListener("click", () => {
@@ -326,61 +162,6 @@ document.addEventListener("click", event => {
     menuButton.setAttribute("aria-expanded", "false");
   }
 });
-
-const searchForm = document.getElementById("searchForm");
-const searchQuery = document.getElementById("searchQuery");
-const searchBtn = document.getElementById("searchBtn");
-const searchStatus = document.getElementById("searchStatus");
-const searchResults = document.getElementById("searchResults");
-const playQuality = document.getElementById("playQuality");
-let availableDownloads = [];
-async function track(type) {
-  try { await fetch("/api/event", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({type})}); } catch {}
-}
-track("view");
-function loadAd(slot, elementId) {
-  fetch("/api/ads").then(r => r.ok ? r.json() : {}).then(data => {
-    const ad = data[slot]; const el = document.getElementById(elementId);
-    if (ad && ad.enabled && ad.text) { el.textContent = ad.text; el.classList.add("visible"); }
-    else { el.textContent = ""; el.classList.remove("visible"); }
-  }).catch(() => {});
-}
-loadAd("home", "homeAd");
-playQuality.addEventListener("change", () => {
-  const chosen = availableDownloads.find(item => item.url === playQuality.value);
-  if (!chosen) return;
-  const currentTime = player.currentTime || 0;
-  player.src = chosen.url; player.hidden = false; player.load();
-  player.addEventListener("loadedmetadata", function restore() {
-    try { player.currentTime = currentTime; } catch {}
-    player.removeEventListener("loadedmetadata", restore);
-  });
-});
-searchForm.addEventListener("submit", async event => {
-  event.preventDefault();
-  const q = searchQuery.value.trim(); if (!q) return;
-  searchBtn.disabled = true; searchBtn.textContent = "در حال جست‌وجو…";
-  searchStatus.textContent = "در حال جست‌وجو در آپارات…"; searchResults.replaceChildren();
-  track("search");
-  try {
-    const response = await fetch("/api/search?q=" + encodeURIComponent(q));
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || "جست‌وجو ناموفق بود.");
-    if (!Array.isArray(data.items) || !data.items.length) { searchStatus.textContent = "نتیجه‌ای پیدا نشد؛ لینک مستقیم را در بخش دریافت از لینک وارد کن."; return; }
-    searchStatus.textContent = "نتایج جست‌وجو: " + data.items.length;
-    data.items.forEach(item => {
-      const card = document.createElement("article"); card.className = "search-item";
-      if (item.thumbnail) { const img = document.createElement("img"); img.src = item.thumbnail; img.alt = ""; img.loading = "lazy"; card.appendChild(img); }
-      const details = document.createElement("div"); details.style.minWidth = "0";
-      const title = document.createElement("strong"); title.textContent = item.title || "ویدیوی آپارات";
-      const choose = document.createElement("button"); choose.type = "button"; choose.textContent = "انتخاب ویدیو";
-      choose.addEventListener("click", () => { urlInput.value = item.url; document.getElementById("videoSection").scrollIntoView({behavior:"smooth"}); form.requestSubmit(); });
-      details.append(title, document.createElement("br"), choose); card.appendChild(details); searchResults.appendChild(card);
-    });
-  } catch (error) { searchStatus.textContent = error.message || "جست‌وجو با خطا روبه‌رو شد."; }
-  finally { searchBtn.disabled = false; searchBtn.textContent = "جست‌وجو"; }
-});
-
 
 window.addEventListener("beforeinstallprompt", (event) => {
   event.preventDefault();
@@ -449,11 +230,6 @@ form.addEventListener("submit", async (event) => {
       throw new Error("لینک دانلود مستقیمی برای این ویدیو پیدا نشد.");
     }
 
-    track("resolve");
-    availableDownloads = data.downloads;
-    playQuality.replaceChildren();
-    const placeholder = document.createElement("option"); placeholder.value = ""; placeholder.textContent = "انتخاب کیفیت"; playQuality.appendChild(placeholder);
-    data.downloads.forEach(item => { const option = document.createElement("option"); option.value = item.url; option.textContent = item.quality || "کیفیت موجود"; playQuality.appendChild(option); });
     titleBox.textContent = data.title || "ویدیوی انتخاب‌شده";
     uploaderBox.textContent = data.uploader
       ? "بارگذار: " + data.uploader
@@ -470,10 +246,7 @@ form.addEventListener("submit", async (event) => {
       player.src = playable.url;
       player.hidden = false;
       player.load();
-      playQuality.value = playable.url;
     }
-    loadAd("before", "beforeDownloadAd");
-    loadAd("during", "duringWatchAd");
 
     data.downloads.forEach(item => {
       const link = document.createElement("a");
@@ -482,7 +255,6 @@ form.addEventListener("submit", async (event) => {
       link.href = "/api/download?url=" +
         encodeURIComponent(item.url) +
         "&quality=" + encodeURIComponent(item.quality || "video");
-      link.addEventListener("click", () => track("download"));
 
       const button = document.createElement("button");
       button.type = "button";
