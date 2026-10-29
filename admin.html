@@ -1,0 +1,180 @@
+
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>مدیریت VidPik</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#0b1020;color:#f3f5fb;font-family:Tahoma,Arial,sans-serif}
+main{max-width:1050px;margin:auto;padding:24px}
+.card{background:#141c2f;border:1px solid #2b3650;border-radius:16px;padding:18px;margin:16px 0}
+h1,h2{line-height:1.7}
+input,textarea{width:100%;padding:12px;margin:8px 0 14px;background:#0b1223;color:white;border:1px solid #34415e;border-radius:9px;font:inherit}
+button{padding:12px 18px;border:0;border-radius:9px;background:#ff7043;color:white;font:inherit;cursor:pointer}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.stat{background:#0b1223;border-radius:10px;padding:14px}
+.stat strong{display:block;font-size:24px;margin-bottom:8px}
+.muted{color:#aab5ca;line-height:1.9}
+.hidden{display:none}
+@media(max-width:600px){.grid{grid-template-columns:repeat(2,1fr)}main{padding:12px}}
+</style>
+</head>
+<body>
+<main>
+<h1>Vid<span style="color:#ff7043">Pik</span> — پنل مدیریت</h1>
+
+<section class="card" id="login">
+<h2>ورود مدیر</h2>
+<p class="muted">برای ورود، رمز مدیری را وارد کن.</p>
+<form id="loginForm">
+<input id="password" type="password" autocomplete="current-password" placeholder="رمز مدیر" required>
+<button>ورود</button>
+</form>
+<p id="loginStatus" class="muted"></p>
+</section>
+
+<div id="dashboard" class="hidden">
+<section class="card">
+<h2>آمار سایت</h2>
+<div class="grid">
+<div class="stat"><strong id="views">—</strong>بازدید</div>
+<div class="stat"><strong id="searches">—</strong>جست‌وجو</div>
+<div class="stat"><strong id="resolves">—</strong>بررسی لینک</div>
+<div class="stat"><strong id="downloads">—</strong>درخواست دانلود</div>
+</div>
+<p class="muted" id="statsStatus"></p>
+<button id="refresh">به‌روزرسانی آمار</button>
+</section>
+
+<section class="card">
+<h2>مدیریت تبلیغات</h2>
+<p class="muted">برای هر جایگاه، متن تبلیغ و وضعیت فعال‌بودن را تنظیم کن.</p>
+<form id="adsForm">
+<label>تبلیغ صفحهٔ اصلی</label>
+<textarea id="homeText" maxlength="1000"></textarea>
+<label><input id="homeEnabled" type="checkbox"> فعال باشد</label>
+
+<label>تبلیغ پیش از دانلود</label>
+<textarea id="beforeText" maxlength="1000"></textarea>
+<label><input id="beforeEnabled" type="checkbox"> فعال باشد</label>
+
+<label>تبلیغ هنگام تماشای ویدیو</label>
+<textarea id="duringText" maxlength="1000"></textarea>
+<label><input id="duringEnabled" type="checkbox"> فعال باشد</label>
+
+<button>ذخیرهٔ تنظیمات</button>
+</form>
+<p id="adsStatus" class="muted"></p>
+</section>
+
+<section class="card">
+<h2>ابزارهای مدیریتی</h2>
+<p class="muted">
+گزارش آمار، کنترل جایگاه‌های تبلیغاتی و مدیریت دسترسی مدیر.
+مدیریت واقعی تبلیغ‌دهندگان، درآمد و کمپین‌ها نیازمند تکمیل بخش سرور و ذخیره‌سازی است.
+</p>
+<button id="logout">خروج از پنل</button>
+<a href="/" style="color:#ff7043;margin-right:12px">بازگشت به سایت</a>
+</section>
+</div>
+</main>
+
+<script>
+let token = "";
+const $ = id => document.getElementById(id);
+
+async function api(path, options = {}) {
+  const headers = {
+    "Content-Type": "application/json",
+    ...(token ? {Authorization: "Bearer " + token} : {})
+  };
+
+  const response = await fetch(path, {...options, headers});
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(data.error || "درخواست ناموفق بود.");
+  }
+  return data;
+}
+
+$("loginForm").addEventListener("submit", async event => {
+  event.preventDefault();
+  $("loginStatus").textContent = "در حال ورود…";
+
+  try {
+    const data = await api("/api/admin/login", {
+      method: "POST",
+      body: JSON.stringify({password: $("password").value})
+    });
+
+    token = data.token;
+    $("login").classList.add("hidden");
+    $("dashboard").classList.remove("hidden");
+    await Promise.all([loadStats(), loadAds()]);
+  } catch (error) {
+    $("loginStatus").textContent = error.message;
+  }
+});
+
+async function loadStats() {
+  try {
+    const data = await api("/api/admin/stats");
+    ["views", "searches", "resolves", "downloads"].forEach(key => {
+      $(key).textContent = data[key] ?? 0;
+    });
+    $("statsStatus").textContent = "";
+  } catch (error) {
+    $("statsStatus").textContent = error.message;
+  }
+}
+
+async function loadAds() {
+  try {
+    const data = await api("/api/admin/ads");
+
+    ["home", "before", "during"].forEach(key => {
+      $(key + "Text").value = data[key]?.text || "";
+      $(key + "Enabled").checked = !!data[key]?.enabled;
+    });
+  } catch (error) {
+    $("adsStatus").textContent = error.message;
+  }
+}
+
+$("refresh").addEventListener("click", loadStats);
+
+$("adsForm").addEventListener("submit", async event => {
+  event.preventDefault();
+
+  const ads = {};
+  ["home", "before", "during"].forEach(key => {
+    ads[key] = {
+      text: $(key + "Text").value,
+      enabled: $(key + "Enabled").checked
+    };
+  });
+
+  try {
+    await api("/api/admin/ads", {
+      method: "PUT",
+      body: JSON.stringify(ads)
+    });
+    $("adsStatus").textContent = "تنظیمات ذخیره شد.";
+  } catch (error) {
+    $("adsStatus").textContent = error.message;
+  }
+});
+
+$("logout").addEventListener("click", () => {
+  token = "";
+  $("dashboard").classList.add("hidden");
+  $("login").classList.remove("hidden");
+  $("password").value = "";
+});
+</script>
+</body>
+</html>
