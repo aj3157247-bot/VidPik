@@ -108,7 +108,9 @@ export default {
           "https://www.aparat.com/api/fa/v1/video/video/search?q=" + encodeURIComponent(q) + "&limit=15&page=1",
           "https://www.aparat.com/api/fa/v1/video/video/search?query=" + encodeURIComponent(q) + "&limit=15&page=1",
           "https://www.aparat.com/api/fa/v1/video/video/search?q=" + encodeURIComponent(q) + "&perpage=15",
-          "https://www.aparat.com/api/fa/v1/video/video/search?search_query=" + encodeURIComponent(q) + "&limit=15"
+          "https://www.aparat.com/api/fa/v1/video/video/search?search_query=" + encodeURIComponent(q) + "&limit=15",
+          "https://www.aparat.com/api/fa/v1/video/video/search?search_term=" + encodeURIComponent(q) + "&limit=15",
+          "https://www.aparat.com/etc/api/videoBySearch/text/" + encodeURIComponent(q)
         ];
         let body = null;
         for (const endpoint of endpoints) {
@@ -127,23 +129,24 @@ export default {
         const normalize = (item) => {
           const attrs = item?.attributes || item || {};
           const title = String(attrs.title || attrs.name || attrs.video_title || "").slice(0, 300);
-          const hash = attrs.uid || attrs.video_hash || attrs.hash || attrs.videohash || attrs.id || "";
+          const hash = attrs.uid || attrs.hash_id || attrs.video_hash || attrs.video_uid || attrs.hash || attrs.videohash || attrs.id || item?.hash_id || item?.uid || "";
           let pageUrl = attrs.url || item?.url || (hash ? "https://www.aparat.com/v/" + hash : "");
           try {
             const parsed = new URL(pageUrl, "https://www.aparat.com");
             if (!["aparat.com", "www.aparat.com", "m.aparat.com"].includes(parsed.hostname.toLowerCase())) return null;
             pageUrl = parsed.href;
-            if (!/^\/v\/[A-Za-z0-9_-]+\/?$/.test(parsed.pathname)) return null;
+            if (!/^\/v\/[A-Za-z0-9_-]+(?:\/[^/]*)?\/?$/.test(parsed.pathname)) return null;
           } catch { return null; }
-          const poster = attrs.big_poster || attrs.small_poster || attrs.poster || attrs.thumbnail || attrs.image || "";
+          const poster = attrs.big_poster || attrs.small_poster || attrs.poster || attrs.thumbnail || attrs.image || attrs.preview || "";
           let thumbnail = "";
             try { const t = new URL(poster); if (t.protocol === "https:" && /(^|\.)asset\.aparat\.com$/i.test(t.hostname)) thumbnail = t.href; } catch {}
           const uploader = String(attrs.username || attrs.sender_name || attrs.owner?.name || attrs.uploader?.name || "").slice(0, 150);
           return title ? {title, uploader, thumbnail, url:pageUrl} : null;
         };
         if (body) {
-          const candidates = body?.data?.items || body?.data?.videos || body?.data?.result || body?.items || body?.videos || body?.data || [];
-          const list = Array.isArray(candidates) ? candidates : (Array.isArray(candidates?.items) ? candidates.items : []);
+          const candidates = body?.data?.items || body?.data?.videos || body?.data?.result || body?.items || body?.videos || body?.data?.attributes?.videos || body?.data || body?.included || body?.videoBySearch || body?.videobysearch || [];
+          let list = Array.isArray(candidates) ? candidates : (Array.isArray(candidates?.items) ? candidates.items : []);
+          if (!list.length && Array.isArray(body?.included)) list = body.included;
           const items = list.map(normalize).filter(Boolean).slice(0, 15);
           if (items.length) return json({items});
         }
