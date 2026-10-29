@@ -6,7 +6,6 @@
 const API_BASE = "https://www.aparat.com/api/fa/v1/video/video/show/videohash/";
 const ALLOWED_PAGE_HOSTS = new Set(["aparat.com", "www.aparat.com", "m.aparat.com"]);
 const ALLOWED_MEDIA_HOST_RE = /(^|\.)asset\.aparat\.com$/i;
-
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
@@ -17,7 +16,6 @@ function json(data, status = 200) {
     }
   });
 }
-
 function getVideoId(raw) {
   let url;
   try { url = new URL(raw); } catch { throw new Error("لینک معتبر نیست."); }
@@ -31,14 +29,12 @@ function getVideoId(raw) {
   if (!/^[A-Za-z0-9_-]{3,32}$/.test(id)) throw new Error("فرمت لینک پشتیبانی نمی‌شود. لینک یک ویدیوی آپارات با قالب /v/شناسه وارد کن.");
   return id;
 }
-
 function safeMediaUrl(raw) {
   try {
     const u = new URL(raw);
     return u.protocol === "https:" && ALLOWED_MEDIA_HOST_RE.test(u.hostname.toLowerCase());
   } catch { return false; }
 }
-
 function normalizeDownloads(attrs) {
   const candidates = [];
   const all = attrs?.file_link_all;
@@ -66,7 +62,6 @@ function normalizeDownloads(attrs) {
   });
   return unique;
 }
-
 async function resolveAparat(raw) {
   const id = getVideoId(raw);
   const endpoint = API_BASE + encodeURIComponent(id);
@@ -99,7 +94,6 @@ async function resolveAparat(raw) {
   } catch {}
   return { title, uploader: String(uploader).slice(0, 150), thumbnail: safeThumbnail, downloads };
 }
-
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -109,13 +103,14 @@ export default {
       const q = (url.searchParams.get("q") || "").trim().slice(0, 120);
       if (!q) return json({ error: "عبارت جست‌وجو را وارد کن." }, 400);
       try {
-        // Aparat may change query requirements; try common public query forms.
+        // Try the currently known public API route variants first.
         const endpoints = [
           "https://www.aparat.com/api/fa/v1/video/video/search?q=" + encodeURIComponent(q) + "&limit=15&page=1",
-          "https://www.aparat.com/api/fa/v1/video/video/search?query=" + encodeURIComponent(q) + "&limit=15&page=1"
+          "https://www.aparat.com/api/fa/v1/video/video/search?query=" + encodeURIComponent(q) + "&limit=15&page=1",
+          "https://www.aparat.com/api/fa/v1/video/video/search?q=" + encodeURIComponent(q) + "&perpage=15",
+          "https://www.aparat.com/api/fa/v1/video/video/search?search_query=" + encodeURIComponent(q) + "&limit=15"
         ];
         let body = null;
-        let lastStatus = 0;
         for (const endpoint of endpoints) {
           const upstream = await fetch(endpoint, {
             headers: {
@@ -125,36 +120,77 @@ export default {
             },
             redirect: "follow"
           });
-          lastStatus = upstream.status;
           if (!upstream.ok) continue;
-          body = await upstream.json().catch(() => null);
-          if (body) break;
+          const parsed = await upstream.json().catch(() => null);
+          if (parsed) { body = parsed; break; }
         }
-        if (!body) return json({ error: "جست‌وجوی آپارات از سمت سرور پاسخ معتبر نداد. این خطا از API آپارات است، نه از عبارت جست‌وجوی شما. فعلاً از بخش لینک ویدیو استفاده کن." , upstreamStatus:lastStatus }, 502);
-        const candidates = body?.data?.items || body?.data?.videos || body?.items || body?.videos || body?.data || [];
-        const sourceItems = Array.isArray(candidates) ? candidates : [];
-        const items = sourceItems.map(item => {
+        const normalize = (item) => {
           const attrs = item?.attributes || item || {};
-          const title = String(attrs.title || attrs.name || "").slice(0, 300);
-          const hash = attrs.uid || attrs.video_hash || attrs.hash || attrs.videohash || "";
+          const title = String(attrs.title || attrs.name || attrs.video_title || "").slice(0, 300);
+          const hash = attrs.uid || attrs.video_hash || attrs.hash || attrs.videohash || attrs.id || "";
           let pageUrl = attrs.url || item?.url || (hash ? "https://www.aparat.com/v/" + hash : "");
           try {
             const parsed = new URL(pageUrl, "https://www.aparat.com");
-            if (!new Set(["aparat.com", "www.aparat.com", "m.aparat.com"]).has(parsed.hostname.toLowerCase())) return null;
+            if (!["aparat.com", "www.aparat.com", "m.aparat.com"].includes(parsed.hostname.toLowerCase())) return null;
             pageUrl = parsed.href;
+            if (!/^\/v\/[A-Za-z0-9_-]+\/?$/.test(parsed.pathname)) return null;
           } catch { return null; }
-          const poster = attrs.big_poster || attrs.small_poster || attrs.poster || attrs.thumbnail || "";
+          const poster = attrs.big_poster || attrs.small_poster || attrs.poster || attrs.thumbnail || attrs.image || "";
           let thumbnail = "";
-          try { const t = new URL(poster); if (t.protocol === "https:" && /(^|\.)asset\.aparat\.com$/i.test(t.hostname)) thumbnail = t.href; } catch {}
-          const uploader = String(attrs.username || attrs.sender_name || attrs.owner?.name || "").slice(0, 150);
-          return title && /\/v\/[A-Za-z0-9_-]+/.test(new URL(pageUrl).pathname) ? { title, uploader, thumbnail, url: pageUrl } : null;
-        }).filter(Boolean).slice(0, 15);
-        return json({ items });
+            try { const t = new URL(poster); if (t.protocol === "https:" && /(^|\.)asset\.aparat\.com$/i.test(t.hostname)) thumbnail = t.href; } catch {}
+          const uploader = String(attrs.username || attrs.sender_name || attrs.owner?.name || attrs.uploader?.name || "").slice(0, 150);
+          return title ? {title, uploader, thumbnail, url:pageUrl} : null;
+        };
+        if (body) {
+          const candidates = body?.data?.items || body?.data?.videos || body?.data?.result || body?.items || body?.videos || body?.data || [];
+          const list = Array.isArray(candidates) ? candidates : (Array.isArray(candidates?.items) ? candidates.items : []);
+          const items = list.map(normalize).filter(Boolean).slice(0, 15);
+          if (items.length) return json({items});
+        }
+        // Fallback: parse publicly rendered Aparat search HTML if its JSON API is blocked/changed.
+        const searchPage = "https://www.aparat.com/result/" + encodeURIComponent(q);
+        const pageResponse = await fetch(searchPage, {
+          headers: {
+            "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
+            "referer": "https://www.aparat.com/"
+          },
+          redirect: "follow"
+        });
+        if (pageResponse.ok) {
+          const page = await pageResponse.text();
+          const found = new Map();
+          // Video entries can be rendered into HTML or embedded JSON.
+          const searchablePage = page.replace(/\\\//g, "/").replace(/\\u0026/g, "&");
+          const linkRegex = /(?:https?:\/\/(?:www\.)?aparat\.com)?\/v\/([A-Za-z0-9_-]{3,32})/g;
+          let match;
+          while ((match = linkRegex.exec(searchablePage)) && found.size < 15) {
+            const id = match[1];
+            if (found.has(id)) continue;
+            const from = Math.max(0, match.index - 1800);
+            const to = Math.min(searchablePage.length, match.index + 1800);
+            const chunk = searchablePage.slice(from, to);
+            const clean = value => String(value || "").replace(/&quot;|&#34;/g, '"').replace(/&#x27;|&#39;/g, "'").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+            let title = "";
+            const titleMatch = chunk.match(/(?:title|video_title|name)["']?\s*[:=]\s*["']([^"'<>]{3,300})["']/i)
+              || chunk.match(/aria-label=["']([^"']{3,300})["']/i)
+              || chunk.match(/<title[^>]*>([^<]{3,300})<\/title>/i);
+            if (titleMatch) title = clean(titleMatch[1]);
+            let poster = "";
+            const posterMatch = chunk.match(/https?:\/\/[^"'\s<>]+\.(?:jpg|jpeg|png|webp)(?:\?[^"'\s<>]*)?/i);
+            if (posterMatch) poster = posterMatch[0];
+            let thumbnail = "";
+            try { const t = new URL(poster); if (t.protocol === "https:" && /(^|\.)asset\.aparat\.com$/i.test(t.hostname)) thumbnail = t.href; } catch {}
+            if (!title || /آپارات|aparat/i.test(title) && title.length < 12) title = "ویدیوی آپارات " + id;
+            found.set(id, {title, uploader:"", thumbnail, url:"https://www.aparat.com/v/" + id});
+          }
+          if (found.size) return json({items:[...found.values()]});
+        }
+        return json({error:"آپارات فعلاً نتایج جست‌وجو را در دسترس قرار نمی‌دهد. لطفاً لینک مستقیم ویدیو را از بخش «لینک ویدیو» وارد کن."}, 502);
       } catch {
-        return json({ error: "اتصال به جست‌وجوی آپارات ناموفق بود؛ API ممکن است تغییر کرده باشد." }, 502);
+        return json({error:"اتصال به جست‌وجوی آپارات ناموفق بود. لطفاً کمی بعد دوباره امتحان کن یا از لینک مستقیم استفاده کن."}, 502);
       }
     }
-
     if (url.pathname === "/api/resolve") {
       if (request.method !== "GET") return json({ error: "فقط درخواست GET پذیرفته می‌شود." }, 405);
       const raw = url.searchParams.get("url");
