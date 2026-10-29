@@ -1,123 +1,292 @@
-const API_BASE = "https://www.aparat.com/api/fa/v1/video/video/show/videohash/";
 
-function json(data, status = 200) {
+const API_BASE =
+  "https://www.aparat.com/api/fa/v1/video/video/show/videohash/";
+
+function json(data, status = 200, headers = {}) {
   return new Response(JSON.stringify(data), {
     status,
     headers: {
       "content-type": "application/json; charset=utf-8",
       "cache-control": "no-store",
-      "x-content-type-options": "nosniff"
+      "x-content-type-options": "nosniff",
+      ...headers
     }
   });
 }
 
-function getVideoId(raw) {
-  let url;
-  try { url = new URL(raw); } catch { throw new Error("لینک معتبر نیست."); }
-  if (url.protocol !== "https:" && url.protocol !== "http:") throw new Error("فقط لینک HTTP/HTTPS پذیرفته می‌شود.");
-  const host = url.hostname.toLowerCase();
-  if (!["aparat.com", "www.aparat.com", "m.aparat.com"].includes(host)) {
-    throw new Error("لطفاً فقط لینک‌های دامنه aparat.com را وارد کن.");
+function isAllowedHost(host) {
+  host = host.toLowerCase();
+  return host === "aparat.com" ||
+    host.endsWith(".aparat.com") ||
+    host === "aparat.ir" ||
+    host.endsWith(".aparat.ir");
+}
+
+function validMediaUrl(value) {
+  try {
+    const u = new URL(value);
+    return u.protocol === "https:" && isAllowedHost(u.hostname);
+  } catch {
+    return false;
   }
-  const parts = url.pathname.split("/").filter(Boolean);
+}
+
+function getVideoId(value) {
+  let u;
+
+  try {
+    u = new URL(value);
+  } catch {
+    throw new Error("لینک واردشده معتبر نیست.");
+  }
+
+  if (
+    !["aparat.com", "www.aparat.com", "m.aparat.com"]
+      .includes(u.hostname.toLowerCase())
+  ) {
+    throw new Error("لطفاً لینک ویدیوی آپارات را وارد کن.");
+  }
+
+  const parts = u.pathname.split("/").filter(Boolean);
   let id = "";
-  if (parts[0] === "v" && parts[1]) id = parts[1];
-  else if (parts[0] === "video" && parts[1] === "video" && parts[2] === "embed" && parts[3] === "videohash" && parts[4]) id = parts[4];
-  else if (parts[0] === "shorts" && parts[1]) id = parts[1];
-  if (!/^[A-Za-z0-9_-]{3,40}$/.test(id)) {
-    throw new Error("قالب لینک پشتیبانی نمی‌شود. لینک یک ویدیو مانند https://www.aparat.com/v/VIDEO_ID وارد کن.");
+
+  if (parts[0] === "v" && parts[1]) {
+    id = parts[1];
+  } else if (
+    parts[0] === "video" &&
+    parts[1] === "video" &&
+    parts[2] === "embed" &&
+    parts[3] === "videohash" &&
+    parts[4]
+  ) {
+    id = parts[4];
   }
+
+  if (!/^[a-zA-Z0-9_-]{3,40}$/.test(id)) {
+    throw new Error("قالب لینک پشتیبانی نمی‌شود.");
+  }
+
   return id;
 }
 
-function isAparatMediaUrl(raw) {
-  try {
-    const u = new URL(raw);
-    const host = u.hostname.toLowerCase();
-    return u.protocol === "https:" &&
-      (host === "aparat.com" || host.endsWith(".aparat.com") || host === "aparat.ir" || host.endsWith(".aparat.ir"));
-  } catch { return false; }
-}
+function extractDownloads(attributes) {
+  const downloads = [];
 
-function normalizeDownloads(attrs) {
-  const candidates = [];
-  const all = attrs?.file_link_all;
+  const all = attributes?.file_link_all;
+
   if (Array.isArray(all)) {
     for (const item of all) {
-      const quality = item?.profile || item?.quality || item?.label || "";
+      const quality = String(
+        item?.profile || item?.quality || item?.label || "کیفیت موجود"
+      );
+
       const urls = Array.isArray(item?.urls) ? item.urls : [];
-      for (const raw of urls) {
-        if (typeof raw === "string" && isAparatMediaUrl(raw)) {
-          candidates.push({ quality: String(quality || "کیفیت موجود"), url: raw });
+
+      for (const url of urls) {
+        if (typeof url === "string" && validMediaUrl(url)) {
+          downloads.push({ quality, url });
         }
       }
     }
   }
-  if (typeof attrs?.file_link === "string" && isAparatMediaUrl(attrs.file_link)) {
-    candidates.push({ quality: String(attrs.profile || "کیفیت موجود"), url: attrs.file_link });
+
+  for (const key of ["file_link", "download_link"]) {
+    const url = attributes?.[key];
+
+    if (typeof url === "string" && validMediaUrl(url)) {
+      downloads.push({
+        quality: String(attributes?.profile || "کیفیت موجود"),
+        url
+      });
+    }
   }
-  if (typeof attrs?.download_link === "string" && isAparatMediaUrl(attrs.download_link)) {
-    candidates.push({ quality: String(attrs.profile || "کیفیت موجود"), url: attrs.download_link });
-  }
-  const unique = [...new Map(candidates.map(x => [x.url, x])).values()];
-  unique.sort((a, b) => {
-    const ra = Number((a.quality.match(/\d{3,4}/) || [0])[0]);
-    const rb = Number((b.quality.match(/\d{3,4}/) || [0])[0]);
-    return ra - rb;
-  });
-  return unique.slice(0, 12);
+
+  return [...new Map(
+    downloads.map(item => [item.url, item])
+  ).values()].slice(0, 12);
 }
 
 export async function onRequestGet({ request }) {
-  const url = new URL(request.url);
-  if (url.pathname !== "/api/resolve") return json({ error: "مسیر پیدا نشد." }, 404);
-  const raw = url.searchParams.get("url");
-  if (!raw || raw.length > 2048) return json({ error: "لینک ویدیو را وارد کن." }, 400);
+  const requestUrl = new URL(request.url);
+
+  // مسیر دانلود
+  if (requestUrl.pathname === "/api/download") {
+    const mediaUrl = requestUrl.searchParams.get("url");
+    const quality = (
+      requestUrl.searchParams.get("quality") || "video"
+    ).replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 20);
+
+    if (
+      !mediaUrl ||
+      mediaUrl.length > 4096 ||
+      !validMediaUrl(mediaUrl)
+    ) {
+      return json({ error: "لینک فایل معتبر نیست." }, 400);
+    }
+
+    try {
+      const headers = new Headers();
+      const range = request.headers.get("range");
+
+      if (range) headers.set("range", range);
+
+      const upstream = await fetch(mediaUrl, {
+        headers,
+        redirect: "manual"
+      });
+
+      if ([301, 302, 303, 307, 308].includes(upstream.status)) {
+        const location = upstream.headers.get("location");
+
+        if (!location) {
+          return json({ error: "آدرس فایل دریافت نشد." }, 502);
+        }
+
+        let target;
+
+        try {
+          target = new URL(location, mediaUrl);
+        } catch {
+          return json({ error: "آدرس فایل نامعتبر است." }, 502);
+        }
+
+        if (!validMediaUrl(target.href)) {
+          return json({
+            error: "منبع دانلود به دامنه دیگری منتقل شده است."
+          }, 502);
+        }
+
+        return json({
+          error: "منبع فایل تغییر مسیر می‌دهد؛ این نسخه هنوز آن مسیر را دنبال نمی‌کند."
+        }, 502);
+      }
+
+      if (!upstream.ok && upstream.status !== 206) {
+        return json({
+          error: "دریافت فایل ناموفق بود: HTTP " + upstream.status
+        }, 502);
+      }
+
+      const responseHeaders = new Headers({
+        "content-type":
+          upstream.headers.get("content-type") ||
+          "application/octet-stream",
+        "content-disposition":
+          `attachment; filename="VidPik-${quality || "video"}.mp4"`,
+        "cache-control": "no-store",
+        "x-content-type-options": "nosniff"
+      });
+
+      for (const name of [
+        "content-length",
+        "content-range",
+        "accept-ranges"
+      ]) {
+        const value = upstream.headers.get(name);
+        if (value) responseHeaders.set(name, value);
+      }
+
+      return new Response(upstream.body, {
+        status: upstream.status,
+        headers: responseHeaders
+      });
+
+    } catch {
+      return json({
+        error: "ارتباط با منبع فایل ناموفق بود."
+      }, 502);
+    }
+  }
+
+  // مسیر بررسی ویدیو
+  if (requestUrl.pathname !== "/api/resolve") {
+    return json({ error: "مسیر پیدا نشد." }, 404);
+  }
+
+  const raw = requestUrl.searchParams.get("url");
+
+  if (!raw || raw.length > 2048) {
+    return json({ error: "لینک ویدیو را وارد کن." }, 400);
+  }
 
   let id;
-  try { id = getVideoId(raw); }
-  catch (e) { return json({ error: e.message }, 400); }
 
   try {
-    const response = await fetch(API_BASE + encodeURIComponent(id), {
-      headers: {
-        "accept": "application/json, text/plain, */*",
-        "user-agent": "Mozilla/5.0 (compatible; VidPik/1.0)"
-      },
-      redirect: "follow"
-    });
+    id = getVideoId(raw);
+  } catch (error) {
+    return json({ error: error.message }, 400);
+  }
+
+  try {
+    const response = await fetch(
+      API_BASE + encodeURIComponent(id),
+      {
+        headers: {
+          "accept": "application/json",
+          "user-agent": "Mozilla/5.0"
+        }
+      }
+    );
+
     if (!response.ok) {
-      if (response.status === 404) return json({ error: "ویدیو پیدا نشد یا در دسترس نیست." }, 404);
-      if (response.status === 401 || response.status === 403) return json({ error: "آپارات دسترسی به اطلاعات این ویدیو را محدود کرده است." }, 502);
-      return json({ error: "آپارات پاسخ موفق نداد (HTTP " + response.status + ")." }, 502);
+      return json({
+        error: "آپارات اطلاعات ویدیو را ارائه نکرد: HTTP " +
+          response.status
+      }, 502);
     }
+
     const body = await response.json();
-    const attrs = body?.data?.attributes || body?.data || body?.attributes;
-    if (!attrs || typeof attrs !== "object") {
-      return json({ error: "ساختار پاسخ آپارات تغییر کرده یا اطلاعات ویدیو در دسترس نیست." }, 502);
+
+    const attributes =
+      body?.data?.attributes ||
+      body?.data ||
+      body?.attributes;
+
+    if (!attributes || typeof attributes !== "object") {
+      return json({
+        error: "ساختار پاسخ آپارات قابل‌شناسایی نیست."
+      }, 502);
     }
-    if (attrs.can_download === false || attrs.can_download === 0 || attrs.can_download === "0") {
-      return json({ error: "برای این ویدیو لینک دانلود مستقیم از سوی آپارات ارائه نشده است." }, 404);
-    }
-    const downloads = normalizeDownloads(attrs);
+
+    const downloads = extractDownloads(attributes);
+
     if (!downloads.length) {
-      return json({ error: "لینک فایل مستقیم پیدا نشد. ممکن است این ویدیو فقط پخش آنلاین داشته باشد یا API آپارات تغییر کرده باشد." }, 404);
+      return json({
+        error: "لینک دانلود مستقیم پیدا نشد یا API آپارات تغییر کرده است."
+      }, 404);
     }
-    const title = String(attrs.title || attrs.name || "ویدیوی آپارات").slice(0, 300);
-    const uploader = attrs.username || attrs.sender_name || attrs.owner?.name || attrs.uploader?.name || "";
-    const thumbnail = attrs.big_poster || attrs.small_poster || attrs.poster || attrs.thumbnail || "";
-    let safeThumbnail = "";
+
+    let thumbnail = "";
+
+    const poster =
+      attributes.big_poster ||
+      attributes.small_poster ||
+      attributes.poster ||
+      "";
+
     try {
-      const t = new URL(thumbnail);
-      if (t.protocol === "https:" && (t.hostname.endsWith(".aparat.com") || t.hostname === "aparat.com")) safeThumbnail = t.href;
+      const imageUrl = new URL(poster);
+
+      if (
+        imageUrl.protocol === "https:" &&
+        isAllowedHost(imageUrl.hostname)
+      ) {
+        thumbnail = imageUrl.href;
+      }
     } catch {}
+
     return json({
-      title,
-      uploader: String(uploader).slice(0, 150),
-      thumbnail: safeThumbnail,
+      title: String(attributes.title || "ویدیوی آپارات").slice(0, 300),
+      uploader: String(
+        attributes.username || attributes.sender_name || ""
+      ).slice(0, 150),
+      thumbnail,
       downloads
     });
-  } catch (error) {
-    return json({ error: "ارتباط با آپارات ناموفق بود. کمی بعد دوباره تلاش کن." }, 502);
+
+  } catch {
+    return json({
+      error: "ارتباط با API آپارات ناموفق بود."
+    }, 502);
   }
 }
