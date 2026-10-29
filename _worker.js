@@ -196,7 +196,7 @@ export default {
         if (contentType.includes("text/html") || contentType.includes("application/json")) {
           return json({ error: "سایت منبع به‌جای فایل ویدیو، صفحهٔ وب برگرداند. این ویدیو لینک دانلود مستقیم قابل‌دسترسی ندارد." }, 502);
         }
-        const disposition = 'attachment; filename="vidpik-video.mp4"; filename*=UTF-8''VidPik-video.mp4';
+        const disposition = 'attachment; filename="vidpik-video.mp4"';
         const headers = new Headers({
           "content-type": contentType || "application/octet-stream",
           "content-disposition": disposition,
