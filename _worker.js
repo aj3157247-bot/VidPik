@@ -194,6 +194,59 @@ export default {
         return json({error:"اتصال به جست‌وجوی آپارات ناموفق بود. لطفاً کمی بعد دوباره امتحان کن یا از لینک مستقیم استفاده کن."}, 502);
       }
     }
+    if (url.pathname === "/api/download") {
+      if (request.method !== "GET" && request.method !== "HEAD") {
+        return json({ error: "فقط درخواست GET پذیرفته می‌شود." }, 405);
+      }
+      const mediaUrl = url.searchParams.get("url") || "";
+      const quality = (url.searchParams.get("quality") || "video")
+        .replace(/[^A-Za-z0-9_-]/g, "")
+        .slice(0, 20) || "video";
+      if (!mediaUrl || mediaUrl.length > 4096 || !safeMediaUrl(mediaUrl)) {
+        return json({ error: "لینک مستقیم فایل معتبر نیست؛ دوباره کیفیت ویدیو را انتخاب کن." }, 400);
+      }
+      try {
+        const upstreamHeaders = new Headers({
+          "accept": "video/*, application/octet-stream, */*",
+          "user-agent": "Mozilla/5.0 (compatible; VidPikDownload/1.0)"
+        });
+        const range = request.headers.get("range");
+        if (range) upstreamHeaders.set("range", range);
+        const upstream = await fetch(mediaUrl, {
+          method: request.method,
+          headers: upstreamHeaders,
+          redirect: "follow"
+        });
+        if (!upstream.ok && upstream.status !== 206) {
+          return json({ error: "سرور آپارات فایل ویدیو را نداد (HTTP " + upstream.status + ")." }, 502);
+        }
+        // Do not save an HTML error/login page with an .mp4 filename.
+        const contentType = (upstream.headers.get("content-type") || "").toLowerCase();
+        if (contentType.includes("text/html") || contentType.includes("application/json")) {
+          return json({ error: "آپارات به‌جای فایل ویدیو یک صفحه وب برگرداند؛ لینک دانلود این کیفیت معتبر نیست." }, 502);
+        }
+        // Reject redirects to unexpected hosts if the runtime exposes the final URL.
+        if (upstream.url && !safeMediaUrl(upstream.url)) {
+          return json({ error: "آدرس نهایی دانلود خارج از دامنه مجاز آپارات است." }, 502);
+        }
+        const headers = new Headers({
+          "content-type": contentType || "application/octet-stream",
+          "content-disposition": "attachment; filename=\"VidPik-" + quality + ".mp4\"",
+          "cache-control": "no-store",
+          "x-content-type-options": "nosniff"
+        });
+        for (const name of ["content-length", "content-range", "accept-ranges"]) {
+          const value = upstream.headers.get(name);
+          if (value) headers.set(name, value);
+        }
+        return new Response(request.method === "HEAD" ? null : upstream.body, {
+          status: upstream.status,
+          headers
+        });
+      } catch {
+        return json({ error: "ارتباط با سرور فایل ناموفق بود؛ دوباره امتحان کن." }, 502);
+      }
+    }
     if (url.pathname === "/api/resolve") {
       if (request.method !== "GET") return json({ error: "فقط درخواست GET پذیرفته می‌شود." }, 405);
       const raw = url.searchParams.get("url");
