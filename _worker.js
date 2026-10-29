@@ -109,13 +109,28 @@ export default {
       const q = (url.searchParams.get("q") || "").trim().slice(0, 120);
       if (!q) return json({ error: "عبارت جست‌وجو را وارد کن." }, 400);
       try {
-        const endpoint = "https://www.aparat.com/api/fa/v1/video/video/search?q=" + encodeURIComponent(q) + "&limit=15";
-        const upstream = await fetch(endpoint, {
-          headers: { "accept": "application/json, text/plain, */*", "user-agent": "Mozilla/5.0 (compatible; VidPik/1.0)" },
-          redirect: "follow"
-        });
-        if (!upstream.ok) return json({ error: "جست‌وجوی آپارات فعلاً پاسخ موفق نداد (HTTP " + upstream.status + "). از بخش لینک ویدیو استفاده کن." }, 502);
-        const body = await upstream.json().catch(() => null);
+        // Aparat may change query requirements; try common public query forms.
+        const endpoints = [
+          "https://www.aparat.com/api/fa/v1/video/video/search?q=" + encodeURIComponent(q) + "&limit=15&page=1",
+          "https://www.aparat.com/api/fa/v1/video/video/search?query=" + encodeURIComponent(q) + "&limit=15&page=1"
+        ];
+        let body = null;
+        let lastStatus = 0;
+        for (const endpoint of endpoints) {
+          const upstream = await fetch(endpoint, {
+            headers: {
+              "accept": "application/json, text/plain, */*",
+              "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36",
+              "referer": "https://www.aparat.com/"
+            },
+            redirect: "follow"
+          });
+          lastStatus = upstream.status;
+          if (!upstream.ok) continue;
+          body = await upstream.json().catch(() => null);
+          if (body) break;
+        }
+        if (!body) return json({ error: "جست‌وجوی آپارات از سمت سرور پاسخ معتبر نداد. این خطا از API آپارات است، نه از عبارت جست‌وجوی شما. فعلاً از بخش لینک ویدیو استفاده کن." , upstreamStatus:lastStatus }, 502);
         const candidates = body?.data?.items || body?.data?.videos || body?.items || body?.videos || body?.data || [];
         const sourceItems = Array.isArray(candidates) ? candidates : [];
         const items = sourceItems.map(item => {
