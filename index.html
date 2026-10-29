@@ -1,134 +1,328 @@
-<!doctype html>
+
+<!DOCTYPE html>
 <html lang="fa" dir="rtl">
 <head>
-  <meta charset="utf-8">
+  <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#101426">
-  <meta name="description" content="VidPik؛ لینک و کیفیت‌های قابل‌دسترسی ویدیوهای عمومی آپارات را پیدا کن و دانلود را آغاز کن.">
-  <meta property="og:title" content="VidPik | دانلود ویدیو از آپارات">
-  <meta property="og:description" content="لینک ویدیوی عمومی آپارات را وارد کن و کیفیت‌های قابل‌دسترسی را ببین.">
-  <meta property="og:type" content="website">
+  <meta name="theme-color" content="#0b1020">
+  <meta name="description" content="VidPik؛ ویدیوهای عمومی را جست‌وجو کن، داخل سایت تماشا کن و کیفیت‌های قابل‌دسترسی را دانلود کن.">
+  <title>VidPik | تماشا و دانلود ویدیو</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <title>VidPik | دانلود ویدیو از آپارات</title>
+
   <style>
-    :root{color-scheme:dark;--bg:#0b1020;--panel:#141c2f;--line:#2b3650;--text:#f3f5fb;--muted:#aab5ca;--accent:#ff7043;--accent2:#ff8c65}
-    *{box-sizing:border-box}body{margin:0;font-family:Tahoma,Arial,sans-serif;background:radial-gradient(ellipse at top,#1a2545 0,#0b1020 58%);color:var(--text);min-height:100vh}
-    .wrap{width:min(780px,92%);margin:0 auto;padding:35px 0 26px}.brand{display:flex;align-items:center;gap:12px;margin-bottom:32px}.logo{width:52px;height:52px;border-radius:17px;background:linear-gradient(145deg,#ff8c65,#ff5b2e);display:grid;place-items:center;box-shadow:0 10px 28px #ff6b3530}
-    .brandname{font-size:23px;font-weight:900;letter-spacing:-.5px}.brandname span{color:var(--accent)}.tagline{color:var(--muted);font-size:12px;margin-top:5px}
-    h1{font-size:clamp(27px,5vw,40px);margin:0 0 10px;line-height:1.55;letter-spacing:-.6px}.lead{color:var(--muted);line-height:2;margin:0 0 25px;font-size:15px}
-    .card{background:#141c2fee;border:1px solid var(--line);border-radius:23px;padding:23px;box-shadow:0 22px 70px #0003}
-    label{display:block;font-size:14px;margin-bottom:10px;color:#d9e1f1}.inputrow{display:flex;gap:10px}
-    input{flex:1;min-width:0;background:#0b1223;border:1px solid #34415e;border-radius:13px;padding:15px;color:white;font:inherit;direction:ltr;text-align:left;outline:none}
-    input:focus{border-color:var(--accent);box-shadow:0 0 0 3px #ff6b3520}
-    button{border:0;border-radius:13px;background:var(--accent);color:white;font:inherit;font-weight:bold;padding:0 21px;cursor:pointer;min-height:51px;transition:background .15s,transform .15s}
-    button:hover{background:var(--accent2)}button:active{transform:scale(.99)}button:disabled{opacity:.6;cursor:wait}
-    .hint{font-size:12px;color:var(--muted);line-height:1.9;margin:12px 0 0}.status{margin-top:16px;line-height:1.9;font-size:14px;white-space:pre-wrap}.result{display:none;margin-top:18px;border-top:1px solid var(--line);padding-top:18px}
-    .meta{display:flex;gap:15px;align-items:flex-start}.thumb{width:160px;aspect-ratio:16/9;object-fit:cover;border-radius:12px;background:#080c16}.title{font-weight:bold;line-height:1.8;overflow-wrap:anywhere}.uploader{color:var(--muted);font-size:12px;margin-top:7px}
-    .qualities{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-top:18px}.qbtn{display:block;width:100%;padding:12px 10px;min-height:46px;border:1px solid #3a4764;background:#202b43;font-size:13px}.qbtn:hover{background:#2b3956}
-    .notice{border:1px solid #65502c;background:#2a2418;color:#f4d9a3;border-radius:14px;padding:13px;margin-top:18px;font-size:12px;line-height:2}
-    .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:18px 0 0}.step{border:1px solid #26324b;border-radius:14px;padding:14px;color:var(--muted);font-size:12px;line-height:1.9}.step b{display:block;color:#f3f5fb;font-size:13px;margin-bottom:4px}
-    footer{text-align:center;color:#7f8ca6;font-size:12px;line-height:2;margin-top:25px}a{color:#ffb092}
-    .pill{display:inline-flex;align-items:center;gap:6px;border:1px solid #34415e;border-radius:99px;padding:6px 10px;color:#d9e1f1;font-size:11px;margin-bottom:18px}.dot{width:7px;height:7px;border-radius:50%;background:#55d6a0}
-    @media(max-width:560px){.wrap{padding-top:24px}.card{padding:16px}.inputrow{flex-direction:column}button#resolve{width:100%}.meta{flex-direction:column}.thumb{width:100%;max-height:220px}.steps{grid-template-columns:1fr}.brandname{font-size:21px}}
+    :root {
+      color-scheme: dark;
+      --bg: #0b1020;
+      --panel: #141c2f;
+      --line: #2b3650;
+      --text: #f3f5fb;
+      --muted: #aab5ca;
+      --accent: #ff7043;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Tahoma, Arial, sans-serif;
+      background: radial-gradient(ellipse at top, #1a2545, var(--bg) 65%);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    .wrap {
+      width: min(760px, 92%);
+      margin: auto;
+      padding: 28px 0;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 30px;
+    }
+
+    .logo {
+      width: 52px;
+      height: 52px;
+      border-radius: 16px;
+      background: var(--accent);
+      display: grid;
+      place-items: center;
+      font-size: 28px;
+    }
+
+    .brand-name { font-size: 24px; font-weight: 900; }
+    .brand-name span { color: var(--accent); }
+    .tagline, .muted { color: var(--muted); }
+
+    h1 {
+      font-size: clamp(27px, 5vw, 38px);
+      line-height: 1.6;
+      margin-bottom: 8px;
+    }
+
+    .lead { line-height: 2.1; color: var(--muted); }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      padding: 20px;
+      margin-top: 22px;
+    }
+
+    label { display: block; margin-bottom: 10px; }
+
+    .input-row { display: flex; gap: 10px; }
+
+    input {
+      flex: 1;
+      min-width: 0;
+      padding: 15px;
+      border-radius: 12px;
+      border: 1px solid #34415e;
+      background: #0b1223;
+      color: white;
+      font: inherit;
+      direction: ltr;
+      text-align: left;
+    }
+
+    button {
+      border: 0;
+      border-radius: 12px;
+      background: var(--accent);
+      color: white;
+      padding: 13px 18px;
+      font: inherit;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    button:disabled { opacity: .6; }
+
+    .status { margin-top: 14px; line-height: 2; }
+
+    #result {
+      display: none;
+      margin-top: 20px;
+      padding-top: 18px;
+      border-top: 1px solid var(--line);
+    }
+
+    .video-title {
+      font-size: 17px;
+      font-weight: bold;
+      line-height: 1.9;
+      overflow-wrap: anywhere;
+    }
+
+    video {
+      width: 100%;
+      max-height: 440px;
+      aspect-ratio: 16 / 9;
+      background: #050812;
+      border-radius: 14px;
+      margin-top: 16px;
+    }
+
+    .qualities {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .qualities a { text-decoration: none; }
+    .qualities button { width: 100%; background: #202b43; border: 1px solid #3a4764; }
+    .qualities button:hover { background: #303d5b; }
+
+    .promo {
+      margin-top: 20px;
+      border: 1px solid #65502c;
+      background: #2a2418;
+      color: #f4d9a3;
+      border-radius: 16px;
+      padding: 17px;
+      line-height: 2.1;
+    }
+
+    footer {
+      text-align: center;
+      margin-top: 25px;
+      color: #7f8ca6;
+      font-size: 12px;
+      line-height: 2;
+    }
+
+    @media (max-width: 520px) {
+      .input-row { flex-direction: column; }
+      .input-row button { width: 100%; }
+      .card { padding: 15px; }
+    }
   </style>
 </head>
-<body>
-  <main class="wrap">
-    <div class="brand">
-      <div class="logo" aria-hidden="true">
-        <svg width="29" height="29" viewBox="0 0 32 32" fill="none"><path d="M12 5.5 25 16 12 26.5V5.5Z" fill="white"/><path d="M5 7v18" stroke="white" stroke-width="3" stroke-linecap="round"/></svg>
-      </div>
-      <div><div class="brandname">Vid<span>Pik</span></div><div class="tagline">لینک را وارد کن؛ کیفیت‌های موجود را ببین</div></div>
-    </div>
-    <div class="pill"><span class="dot"></span> ابزار رایگان برای لینک‌های عمومی</div>
-    <h1>دانلود ویدیو از آپارات</h1>
-    <p class="lead">لینک یک ویدیوی عمومی آپارات را وارد کن. VidPik اطلاعات و لینک‌های مستقیمِ قابل‌دسترسی را بررسی می‌کند تا بتوانی کیفیت موجود را انتخاب کنی.</p>
-    <section class="card">
-      <form id="form">
-        <label for="url">لینک ویدیوی آپارات</label>
-        <div class="inputrow">
-          <input id="url" name="url" type="url" required maxlength="2048" placeholder="https://www.aparat.com/v/..." autocomplete="url">
-          <button id="resolve" type="submit">بررسی لینک</button>
-        </div>
-        <p class="hint">لینک کامل یک ویدیو را وارد کن؛ لینک کانال و فهرست پخش پشتیبانی نمی‌شود.</p>
-      </form>
-      <div id="status" class="status" role="status" aria-live="polite"></div>
-      <div id="result" class="result">
-        <div class="meta">
-          <img id="thumb" class="thumb" alt="تصویر بندانگشتی ویدیو" hidden>
-          <div><div id="title" class="title"></div><div id="uploader" class="uploader"></div></div>
-        </div>
-        <div id="qualities" class="qualities"></div>
-        <p class="hint">با انتخاب کیفیت، فایل در برگه جدید باز می‌شود. اگر دانلود خودکار شروع نشد، از منوی مرورگر گزینه «دانلود» یا «ذخیره ویدیو» را بزن.</p>
-      </div>
-    </section>
-    <div class="steps">
-      <div class="step"><b>۱. لینک را کپی کن</b>آدرس یک ویدیوی عمومی آپارات را بردار.</div>
-      <div class="step"><b>۲. بررسی را بزن</b>VidPik کیفیت‌ها و لینک‌های قابل‌دسترسی را جست‌وجو می‌کند.</div>
-      <div class="step"><b>۳. دانلود کن</b>یکی از لینک‌های برگشتی را انتخاب کن.</div>
-    </div>
-    <div class="notice">VidPik ورود، شماره تلفن، محتوای پولی، DRM یا کنترل دسترسی را دور نمی‌زند. عمومی‌بودن صفحه تضمین نمی‌کند فایل مستقیم قابل‌دریافت باشد. فقط محتوایی را دانلود کن که اجازه ذخیره‌کردن آن را داری.</div>
-    <footer>VidPik یک ابزار مستقل است و وابستگی رسمی به آپارات ندارد. پاسخ API یا ساختار لینک‌های آپارات ممکن است تغییر کند.</footer>
-  </main>
-<script>
-const form = document.getElementById('form');
-const urlInput = document.getElementById('url');
-const button = document.getElementById('resolve');
-const statusEl = document.getElementById('status');
-const result = document.getElementById('result');
-const qualities = document.getElementById('qualities');
-const titleEl = document.getElementById('title');
-const uploaderEl = document.getElementById('uploader');
-const thumbEl = document.getElementById('thumb');
 
-function setStatus(message, error=false) {
-  statusEl.textContent = message;
-  statusEl.style.color = error ? '#ff9d9d' : '#b8c6df';
+<body>
+<main class="wrap">
+
+  <header class="brand">
+    <div class="logo" aria-hidden="true">▶</div>
+    <div>
+      <div class="brand-name">Vid<span>Pik</span></div>
+      <div class="tagline">لینک را وارد کن؛ تماشا و دانلود کن</div>
+    </div>
+  </header>
+
+  <h1>ویدیوهایت را آسان دانلود کن!</h1>
+
+  <p class="lead">
+    🎬 هر ویدیوی عمومی که تماشای آن یا دریافت فایلش برایت دردسر شده،
+    لینک آن را اینجا وارد کن! ویدیو را داخل خود VidPik تماشا کن
+    و اگر دانلود مستقیم در دسترس بود، کیفیت دلخواهت را انتخاب کن.
+  </p>
+
+  <section class="card">
+    <form id="videoForm">
+      <label for="videoUrl">لینک ویدیو</label>
+
+      <div class="input-row">
+        <input
+          id="videoUrl"
+          type="url"
+          required
+          maxlength="2048"
+          placeholder="https://www.aparat.com/v/..."
+        >
+        <button id="submitBtn" type="submit">بررسی لینک</button>
+      </div>
+    </form>
+
+    <div id="status" class="status" role="status" aria-live="polite"></div>
+
+    <section id="result">
+      <div id="videoTitle" class="video-title"></div>
+      <div id="uploader" class="muted"></div>
+
+      <video id="videoPlayer"
+        controls
+        playsinline
+        preload="metadata"
+        hidden>
+        مرورگر شما از پخش این ویدیو پشتیبانی نمی‌کند.
+      </video>
+
+      <div id="qualities" class="qualities"></div>
+
+      <p class="muted">
+        برای تماشا از پخش‌کننده بالا استفاده کن؛ برای ذخیره فایل،
+        کیفیت موردنظرت را انتخاب کن.
+      </p>
+    </section>
+  </section>
+
+  <div class="promo">
+    <strong>🚀 VidPik؛ یک لینک تا تماشا و دانلود!</strong><br>
+    دنبال ویدیوی موردعلاقه‌ات هستی؟ لینک را وارد کن، کیفیت‌های
+    قابل‌دسترسی را ببین و بدون مراحل پیچیده، تماشا یا دانلود را امتحان کن.
+  </div>
+
+  <footer>
+    VidPik یک ابزار مستقل است و وابستگی رسمی به وب‌سایت‌های دیگر ندارد.
+  </footer>
+
+</main>
+
+<script>
+const form = document.getElementById("videoForm");
+const urlInput = document.getElementById("videoUrl");
+const submitBtn = document.getElementById("submitBtn");
+const statusBox = document.getElementById("status");
+const result = document.getElementById("result");
+const titleBox = document.getElementById("videoTitle");
+const uploaderBox = document.getElementById("uploader");
+const player = document.getElementById("videoPlayer");
+const qualities = document.getElementById("qualities");
+
+function status(message, error = false) {
+  statusBox.textContent = message;
+  statusBox.style.color = error ? "#ff9d9d" : "#b8c6df";
 }
-form.addEventListener('submit', async (event) => {
+
+form.addEventListener("submit", async (event) => {
   event.preventDefault();
-  result.style.display = 'none';
+
+  result.style.display = "none";
   qualities.replaceChildren();
-  thumbEl.hidden = true;
-  const videoUrl = urlInput.value.trim();
-  button.disabled = true;
-  button.textContent = 'در حال بررسی…';
-  setStatus('در حال بررسی لینک و دریافت اطلاعات ویدیو…');
+  player.pause();
+  player.removeAttribute("src");
+  player.removeAttribute("poster");
+  player.load();
+  player.hidden = true;
+
+  submitBtn.disabled = true;
+  submitBtn.textContent = "در حال بررسی…";
+  status("در حال بررسی لینک ویدیو…");
+
   try {
-    const response = await fetch('/api/resolve?url=' + encodeURIComponent(videoUrl), {
-      headers: { 'Accept': 'application/json' }
-    });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(data.error || 'دریافت اطلاعات ویدیو ناموفق بود.');
-    if (!Array.isArray(data.downloads) || data.downloads.length === 0) {
-      throw new Error('لینک مستقیم پیدا نشد. ممکن است آپارات دانلود مستقیم این ویدیو را ارائه نکند.');
+    const response = await fetch(
+      "/api/resolve?url=" + encodeURIComponent(urlInput.value.trim())
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || "دریافت اطلاعات ناموفق بود.");
     }
-    titleEl.textContent = data.title || 'ویدیوی آپارات';
-    uploaderEl.textContent = data.uploader ? ('بارگذار: ' + data.uploader) : '';
-    if (data.thumbnail) {
-      thumbEl.src = data.thumbnail;
-      thumbEl.hidden = false;
+
+    if (!Array.isArray(data.downloads) || !data.downloads.length) {
+      throw new Error("لینک دانلود مستقیمی برای این ویدیو پیدا نشد.");
     }
-    data.downloads.forEach((item) => {
-      const link = document.createElement('a');
-      link.href = item.url;
-      link.target = '_blank';
-      link.rel = 'noopener noreferrer';
-      link.style.textDecoration = 'none';
-      const q = document.createElement('button');
-      q.type = 'button';
-      q.className = 'qbtn';
-      q.textContent = 'دانلود ' + (item.quality || 'ویدیو');
-      link.appendChild(q);
+
+    titleBox.textContent = data.title || "ویدیوی انتخاب‌شده";
+    uploaderBox.textContent = data.uploader
+      ? "بارگذار: " + data.uploader
+      : "";
+
+    if (data.thumbnail) player.poster = data.thumbnail;
+
+    // پخش داخل همین صفحه؛ به فرمت قابل پخش در مرورگر نیاز دارد.
+    const playable = data.downloads.find(item =>
+      item.url && /\.mp4(?:\?|$)/i.test(item.url)
+    );
+
+    if (playable) {
+      player.src = playable.url;
+      player.hidden = false;
+      player.load();
+    }
+
+    data.downloads.forEach(item => {
+      const link = document.createElement("a");
+
+      // فایل از API سایت عبور می‌کند تا دانلود آغاز شود.
+      link.href = "/api/download?url=" +
+        encodeURIComponent(item.url) +
+        "&quality=" + encodeURIComponent(item.quality || "video");
+
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = "⬇ دانلود " + (item.quality || "ویدیو");
+
+      link.appendChild(button);
       qualities.appendChild(link);
     });
-    result.style.display = 'block';
-    setStatus('لینک‌ها دریافت شد. کیفیت موردنظرت را انتخاب کن.');
-  } catch (err) {
-    setStatus(err.message || 'خطای نامشخص رخ داد.', true);
+
+    result.style.display = "block";
+    status("اطلاعات دریافت شد؛ ویدیو را پخش کن یا کیفیت دلخواه را دانلود کن.");
+
+  } catch (error) {
+    status(error.message || "خطای نامشخص رخ داد.", true);
   } finally {
-    button.disabled = false;
-    button.textContent = 'بررسی لینک';
+    submitBtn.disabled = false;
+    submitBtn.textContent = "بررسی لینک";
   }
 });
 </script>
