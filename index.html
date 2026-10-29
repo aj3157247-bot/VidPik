@@ -58,6 +58,18 @@
     }
 
     .brand-name { font-size: 24px; font-weight: 900; }
+    .menu-wrap { position:relative; margin-right:auto; }
+    .menu-button { padding:10px 13px; background:#202b43; border:1px solid var(--line); }
+    .menu-panel { display:none; position:absolute; z-index:50; top:calc(100% + 8px); right:0; width:210px; padding:8px; border:1px solid var(--line); border-radius:13px; background:#111a2d; box-shadow:0 12px 30px #0008; }
+    .menu-panel.open { display:grid; gap:4px; }
+    .menu-panel a { padding:11px; color:var(--text); text-decoration:none; border-radius:8px; }
+    .menu-panel a:hover { background:#202b43; }
+    .search-results { display:grid; gap:10px; margin-top:14px; }
+    .search-item { display:flex; align-items:center; gap:12px; padding:10px; border:1px solid var(--line); border-radius:12px; background:#0b1223; }
+    .search-item img { width:100px; aspect-ratio:16/9; object-fit:cover; border-radius:8px; }
+    .search-item button { margin-top:8px; padding:9px 12px; }
+    .ad-slot { display:none; margin-top:15px; padding:13px; border:1px dashed #65502c; border-radius:12px; background:#2a2418; color:#f4d9a3; white-space:pre-wrap; overflow-wrap:anywhere; line-height:1.9; }
+    .ad-slot.visible { display:block; }
     .brand { flex-wrap: wrap; }
     .install-top { margin-right: auto; padding: 10px 14px; white-space: nowrap; }
     .brand-name span { color: var(--accent); }
@@ -188,6 +200,15 @@
       <div class="tagline">لینک را وارد کن؛ تماشا و دانلود کن</div>
     </div>
     <button class="install-top" id="installTop" type="button">⬇ نصب اپلیکیشن</button>
+    <div class="menu-wrap">
+      <button class="menu-button" id="menuButton" type="button" aria-expanded="false">☰ منو</button>
+      <nav class="menu-panel" id="menuPanel" aria-label="منوی اصلی">
+        <a href="#searchSection">🔎 جست‌وجوی ویدیو</a>
+        <a href="#videoSection">⬇ دریافت از لینک</a>
+        <a href="#download-app">📱 نصب اپلیکیشن</a>
+        <a href="/admin.html">⚙ پنل مدیریت</a>
+      </nav>
+    </div>
   </header>
 
   <h1>ویدیوهایت را آسان دانلود کن!</h1>
@@ -198,7 +219,21 @@
     و اگر دانلود مستقیم در دسترس بود، کیفیت دلخواهت را انتخاب کن.
   </p>
 
-  <section class="card">
+  <section class="card" id="searchSection">
+    <h2 style="margin-top:0">🔎 جست‌وجوی ویدیو</h2>
+    <p class="muted">عنوان یا کلمهٔ کلیدی ویدیوی عمومی آپارات را جست‌وجو کن.</p>
+    <form id="searchForm">
+      <div class="input-row">
+        <input id="searchQuery" type="search" maxlength="120" placeholder="مثلاً آموزش، موسیقی، فوتبال" required style="direction:rtl;text-align:right">
+        <button id="searchBtn" type="submit">جست‌وجو</button>
+      </div>
+    </form>
+    <div id="searchStatus" class="status" role="status" aria-live="polite"></div>
+    <div id="searchResults" class="search-results"></div>
+  </section>
+  <div id="homeAd" class="ad-slot" aria-label="تبلیغ صفحهٔ اصلی"></div>
+
+  <section class="card" id="videoSection">
     <form id="videoForm">
       <label for="videoUrl">لینک ویدیو</label>
 
@@ -215,10 +250,16 @@
     </form>
 
     <div id="status" class="status" role="status" aria-live="polite"></div>
+    <div id="beforeDownloadAd" class="ad-slot" aria-label="تبلیغ پیش از دانلود"></div>
 
     <section id="result">
       <div id="videoTitle" class="video-title"></div>
       <div id="uploader" class="muted"></div>
+      <div id="duringWatchAd" class="ad-slot" aria-label="تبلیغ هنگام تماشا"></div>
+      <label for="playQuality" style="margin-top:14px">کیفیت پخش آنلاین</label>
+      <select id="playQuality" style="width:100%;padding:12px;border-radius:10px;background:#0b1223;color:white;border:1px solid #34415e;font:inherit">
+        <option value="">انتخاب کیفیت</option>
+      </select>
 
       <video id="videoPlayer"
         controls
@@ -272,6 +313,74 @@ const qualities = document.getElementById("qualities");
 let installPrompt = null;
 const installButtons = [document.getElementById("installApp"), document.getElementById("installTop")];
 const installNote = document.getElementById("installNote");
+
+const menuButton = document.getElementById("menuButton");
+const menuPanel = document.getElementById("menuPanel");
+menuButton.addEventListener("click", () => {
+  const opened = menuPanel.classList.toggle("open");
+  menuButton.setAttribute("aria-expanded", String(opened));
+});
+document.addEventListener("click", event => {
+  if (!event.target.closest(".menu-wrap")) {
+    menuPanel.classList.remove("open");
+    menuButton.setAttribute("aria-expanded", "false");
+  }
+});
+
+const searchForm = document.getElementById("searchForm");
+const searchQuery = document.getElementById("searchQuery");
+const searchBtn = document.getElementById("searchBtn");
+const searchStatus = document.getElementById("searchStatus");
+const searchResults = document.getElementById("searchResults");
+const playQuality = document.getElementById("playQuality");
+let availableDownloads = [];
+async function track(type) {
+  try { await fetch("/api/event", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({type})}); } catch {}
+}
+track("view");
+function loadAd(slot, elementId) {
+  fetch("/api/ads").then(r => r.ok ? r.json() : {}).then(data => {
+    const ad = data[slot]; const el = document.getElementById(elementId);
+    if (ad && ad.enabled && ad.text) { el.textContent = ad.text; el.classList.add("visible"); }
+    else { el.textContent = ""; el.classList.remove("visible"); }
+  }).catch(() => {});
+}
+loadAd("home", "homeAd");
+playQuality.addEventListener("change", () => {
+  const chosen = availableDownloads.find(item => item.url === playQuality.value);
+  if (!chosen) return;
+  const currentTime = player.currentTime || 0;
+  player.src = chosen.url; player.hidden = false; player.load();
+  player.addEventListener("loadedmetadata", function restore() {
+    try { player.currentTime = currentTime; } catch {}
+    player.removeEventListener("loadedmetadata", restore);
+  });
+});
+searchForm.addEventListener("submit", async event => {
+  event.preventDefault();
+  const q = searchQuery.value.trim(); if (!q) return;
+  searchBtn.disabled = true; searchBtn.textContent = "در حال جست‌وجو…";
+  searchStatus.textContent = "در حال جست‌وجو در آپارات…"; searchResults.replaceChildren();
+  track("search");
+  try {
+    const response = await fetch("/api/search?q=" + encodeURIComponent(q));
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "جست‌وجو ناموفق بود.");
+    if (!Array.isArray(data.items) || !data.items.length) { searchStatus.textContent = "نتیجه‌ای پیدا نشد؛ لینک مستقیم را در بخش دریافت از لینک وارد کن."; return; }
+    searchStatus.textContent = "نتایج جست‌وجو: " + data.items.length;
+    data.items.forEach(item => {
+      const card = document.createElement("article"); card.className = "search-item";
+      if (item.thumbnail) { const img = document.createElement("img"); img.src = item.thumbnail; img.alt = ""; img.loading = "lazy"; card.appendChild(img); }
+      const details = document.createElement("div"); details.style.minWidth = "0";
+      const title = document.createElement("strong"); title.textContent = item.title || "ویدیوی آپارات";
+      const choose = document.createElement("button"); choose.type = "button"; choose.textContent = "انتخاب ویدیو";
+      choose.addEventListener("click", () => { urlInput.value = item.url; document.getElementById("videoSection").scrollIntoView({behavior:"smooth"}); form.requestSubmit(); });
+      details.append(title, document.createElement("br"), choose); card.appendChild(details); searchResults.appendChild(card);
+    });
+  } catch (error) { searchStatus.textContent = error.message || "جست‌وجو با خطا روبه‌رو شد."; }
+  finally { searchBtn.disabled = false; searchBtn.textContent = "جست‌وجو"; }
+});
+
 
 window.addEventListener("beforeinstallprompt", (event) => {
   event.preventDefault();
@@ -340,6 +449,11 @@ form.addEventListener("submit", async (event) => {
       throw new Error("لینک دانلود مستقیمی برای این ویدیو پیدا نشد.");
     }
 
+    track("resolve");
+    availableDownloads = data.downloads;
+    playQuality.replaceChildren();
+    const placeholder = document.createElement("option"); placeholder.value = ""; placeholder.textContent = "انتخاب کیفیت"; playQuality.appendChild(placeholder);
+    data.downloads.forEach(item => { const option = document.createElement("option"); option.value = item.url; option.textContent = item.quality || "کیفیت موجود"; playQuality.appendChild(option); });
     titleBox.textContent = data.title || "ویدیوی انتخاب‌شده";
     uploaderBox.textContent = data.uploader
       ? "بارگذار: " + data.uploader
@@ -356,7 +470,10 @@ form.addEventListener("submit", async (event) => {
       player.src = playable.url;
       player.hidden = false;
       player.load();
+      playQuality.value = playable.url;
     }
+    loadAd("before", "beforeDownloadAd");
+    loadAd("during", "duringWatchAd");
 
     data.downloads.forEach(item => {
       const link = document.createElement("a");
@@ -365,6 +482,7 @@ form.addEventListener("submit", async (event) => {
       link.href = "/api/download?url=" +
         encodeURIComponent(item.url) +
         "&quality=" + encodeURIComponent(item.quality || "video");
+      link.addEventListener("click", () => track("download"));
 
       const button = document.createElement("button");
       button.type = "button";
