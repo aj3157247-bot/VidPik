@@ -169,6 +169,52 @@ export default {
         return json({ error: error instanceof Error ? error.message : "خطای نامشخص." }, 400);
       }
     }
+    // Download only verified public Aparat media URLs; never return the app's HTML page as a download.
+    if (url.pathname === "/api/download") {
+      if (request.method !== "GET" && request.method !== "HEAD") return json({ error: "فقط GET و HEAD پذیرفته می‌شود." }, 405);
+      const raw = url.searchParams.get("url");
+      if (!raw || raw.length > 4096 || !safeMediaUrl(raw)) {
+        return json({ error: "لینک مستقیم و معتبر فایل ویدیویی آپارات لازم است." }, 400);
+      }
+      try {
+        const upstream = await fetch(raw, {
+          method: request.method,
+          headers: {
+            "accept": "video/*, application/octet-stream;q=0.9, */*;q=0.8",
+            ...(request.headers.has("range") ? { "range": request.headers.get("range") } : {})
+          },
+          redirect: "follow"
+        });
+        // Check the final URL as well, in case the media host redirected elsewhere.
+        if (!safeMediaUrl(upstream.url || raw)) {
+          return json({ error: "سرور فایل به دامنهٔ تأییدنشده هدایت شد؛ دانلود متوقف شد." }, 502);
+        }
+        if (!upstream.ok && upstream.status !== 206) {
+          return json({ error: "دریافت فایل ویدیو ناموفق بود (HTTP " + upstream.status + ")." }, 502);
+        }
+        const contentType = (upstream.headers.get("content-type") || "").toLowerCase();
+        if (contentType.includes("text/html") || contentType.includes("application/json")) {
+          return json({ error: "سایت منبع به‌جای فایل ویدیو، صفحهٔ وب برگرداند. این ویدیو لینک دانلود مستقیم قابل‌دسترسی ندارد." }, 502);
+        }
+        const disposition = 'attachment; filename="vidpik-video.mp4"; filename*=UTF-8''VidPik-video.mp4';
+        const headers = new Headers({
+          "content-type": contentType || "application/octet-stream",
+          "content-disposition": disposition,
+          "cache-control": "no-store",
+          "x-content-type-options": "nosniff"
+        });
+        for (const name of ["content-length", "accept-ranges", "content-range"]) {
+          const value = upstream.headers.get(name);
+          if (value) headers.set(name, value);
+        }
+        return new Response(request.method === "HEAD" ? null : upstream.body, {
+          status: upstream.status,
+          headers
+        });
+      } catch (error) {
+        return json({ error: "اتصال برای دریافت فایل ویدیو ناموفق بود. دوباره تلاش کن." }, 502);
+      }
+    }
     // Required for Cloudflare Pages Advanced Mode: serve static assets.
     if (env.ASSETS && typeof env.ASSETS.fetch === "function") return env.ASSETS.fetch(request);
     return new Response("Not Found", { status: 404 });
