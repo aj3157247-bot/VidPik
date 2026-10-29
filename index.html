@@ -8,6 +8,10 @@
   <meta name="description" content="VidPik؛ ویدیوهای عمومی را جست‌وجو کن، داخل سایت تماشا کن و کیفیت‌های قابل‌دسترسی را دانلود کن.">
   <title>VidPik | تماشا و دانلود ویدیو</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="VidPik">
 
   <style>
     :root {
@@ -54,6 +58,8 @@
     }
 
     .brand-name { font-size: 24px; font-weight: 900; }
+    .brand { flex-wrap: wrap; }
+    .install-top { margin-right: auto; padding: 10px 14px; white-space: nowrap; }
     .brand-name span { color: var(--accent); }
     .tagline, .muted { color: var(--muted); }
 
@@ -139,6 +145,13 @@
     .qualities button { width: 100%; background: #202b43; border: 1px solid #3a4764; }
     .qualities button:hover { background: #303d5b; }
 
+    .app-promo { margin-top: 22px; padding: 22px; border: 1px solid #ff7043; border-radius: 22px; background: linear-gradient(135deg, #202943, #151b2d 60%, #332018); }
+    .app-promo h2 { margin: 0 0 8px; font-size: 23px; }
+    .app-promo p { color: var(--muted); line-height: 2; margin: 0 0 15px; }
+    .install-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+    .install-actions button { background: linear-gradient(135deg, #ff7b35, #f04438); }
+    .install-note { display:block; margin-top:10px; font-size:12px; color:var(--muted); line-height:1.8; }
+
     .promo {
       margin-top: 20px;
       border: 1px solid #65502c;
@@ -174,6 +187,7 @@
       <div class="brand-name">Vid<span>Pik</span></div>
       <div class="tagline">لینک را وارد کن؛ تماشا و دانلود کن</div>
     </div>
+    <button class="install-top" id="installTop" type="button">⬇ نصب اپلیکیشن</button>
   </header>
 
   <h1>ویدیوهایت را آسان دانلود کن!</h1>
@@ -223,6 +237,16 @@
     </section>
   </section>
 
+  <section class="app-promo" id="download-app">
+    <h2>📱 اپلیکیشن VidPik؛ همیشه همراهت</h2>
+    <p>نسخهٔ نصب‌شوندهٔ وب را به صفحهٔ اصلی موبایلت اضافه کن تا مثل یک اپلیکیشن، سریع و تمام‌صفحه از VidPik استفاده کنی. نصب رایگان است و از همین سایت انجام می‌شود.</p>
+    <div class="install-actions">
+      <button id="installApp" type="button">⬇ نصب / دریافت اپلیکیشن</button>
+      <button id="howToInstall" type="button">راهنمای نصب</button>
+    </div>
+    <span class="install-note" id="installNote" aria-live="polite">برای نصب، این صفحه را با Chrome در اندروید باز کن. اگر دکمهٔ نصب پشتیبانی نشود، از منوی مرورگر گزینهٔ «Add to Home screen / افزودن به صفحهٔ اصلی» را انتخاب کن.</span>
+  </section>
+
   <div class="promo">
     <strong>🚀 VidPik؛ یک لینک تا تماشا و دانلود!</strong><br>
     دنبال ویدیوی موردعلاقه‌ات هستی؟ لینک را وارد کن، کیفیت‌های
@@ -245,6 +269,41 @@ const titleBox = document.getElementById("videoTitle");
 const uploaderBox = document.getElementById("uploader");
 const player = document.getElementById("videoPlayer");
 const qualities = document.getElementById("qualities");
+let installPrompt = null;
+const installButtons = [document.getElementById("installApp"), document.getElementById("installTop")];
+const installNote = document.getElementById("installNote");
+
+window.addEventListener("beforeinstallprompt", (event) => {
+  event.preventDefault();
+  installPrompt = event;
+  installNote.textContent = "آمادهٔ نصب است؛ روی دکمهٔ نصب بزن.";
+});
+
+window.addEventListener("appinstalled", () => {
+  installPrompt = null;
+  installNote.textContent = "اپلیکیشن VidPik با موفقیت به دستگاهت اضافه شد.";
+});
+
+async function installVidPik() {
+  if (installPrompt) {
+    installPrompt.prompt();
+    const choice = await installPrompt.userChoice;
+    installNote.textContent = choice.outcome === "accepted"
+      ? "درخواست نصب پذیرفته شد."
+      : "نصب لغو شد؛ هر زمان خواستی دوباره امتحان کن.";
+    installPrompt = null;
+    return;
+  }
+  installNote.textContent = "در Chrome اندروید: منوی سه‌نقطه را باز کن و «Install app» یا «Add to Home screen» را بزن. در iPhone: Share و سپس Add to Home Screen را انتخاب کن.";
+}
+installButtons.forEach(button => button.addEventListener("click", installVidPik));
+document.getElementById("howToInstall").addEventListener("click", () => {
+  installNote.textContent = "اندروید: سایت را در Chrome باز کن، منوی سه‌نقطه ← Install app یا Add to Home screen. آیفون: دکمهٔ Share در Safari ← Add to Home Screen. برای نصب باید سایت با HTTPS باز شود.";
+});
+
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => navigator.serviceWorker.register("/sw.js").catch(() => {}));
+}
 
 function status(message, error = false) {
   statusBox.textContent = message;

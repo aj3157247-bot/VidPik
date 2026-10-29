@@ -39,63 +39,6 @@ function safeMediaUrl(raw) {
   } catch { return false; }
 }
 
-async function downloadMedia(request) {
-  const requestUrl = new URL(request.url);
-  const raw = requestUrl.searchParams.get("url");
-  const quality = (requestUrl.searchParams.get("quality") || "video")
-    .replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 20) || "video";
-
-  if (!raw || raw.length > 4096 || !safeMediaUrl(raw)) {
-    return json({ error: "لینک فایل دانلود معتبر نیست." }, 400);
-  }
-
-  try {
-    const upstreamHeaders = new Headers({
-      "user-agent": "Mozilla/5.0",
-      "accept": "*/*"
-    });
-    const range = request.headers.get("range");
-    if (range) upstreamHeaders.set("range", range);
-
-    // Stream the media file through the Worker; do not redirect the browser
-    // to a raw media URL or return a JSON response as the download.
-    const upstream = await fetch(raw, {
-      method: "GET",
-      headers: upstreamHeaders,
-      redirect: "follow"
-    });
-
-    if (!upstream.ok && upstream.status !== 206) {
-      return json({
-        error: "سرور آپارات فایل را ارسال نکرد. کد HTTP: " + upstream.status
-      }, 502);
-    }
-
-    const contentType = upstream.headers.get("content-type") || "application/octet-stream";
-    if (contentType.includes("text/html") || contentType.includes("application/json")) {
-      return json({ error: "سرور به‌جای فایل ویدیو، پاسخ غیرقابل‌دانلود فرستاد." }, 502);
-    }
-
-    const headers = new Headers({
-      "content-type": contentType,
-      "content-disposition": `attachment; filename="VidPik-${quality}.mp4"`,
-      "cache-control": "no-store",
-      "x-content-type-options": "nosniff"
-    });
-    for (const name of ["content-length", "content-range", "accept-ranges"]) {
-      const value = upstream.headers.get(name);
-      if (value) headers.set(name, value);
-    }
-
-    return new Response(upstream.body, {
-      status: upstream.status,
-      headers
-    });
-  } catch {
-    return json({ error: "ارتباط با سرور فایل ناموفق بود؛ دوباره تلاش کن." }, 502);
-  }
-}
-
 function normalizeDownloads(attrs) {
   const candidates = [];
   const all = attrs?.file_link_all;
@@ -161,10 +104,6 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (url.pathname === "/api/health") return json({ ok: true, service: "public-aparat-link-resolver" });
-    if (url.pathname === "/api/download") {
-      if (request.method !== "GET") return json({ error: "فقط درخواست GET پذیرفته می‌شود." }, 405);
-      return downloadMedia(request);
-    }
     if (url.pathname === "/api/resolve") {
       if (request.method !== "GET") return json({ error: "فقط درخواست GET پذیرفته می‌شود." }, 405);
       const raw = url.searchParams.get("url");
