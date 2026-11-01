@@ -97,6 +97,39 @@ async function resolveAparat(raw) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    // Search-engine endpoints. Only stable, public pages belong in the sitemap.
+    if (url.pathname === "/sitemap.xml") {
+      if (request.method !== "GET" && request.method !== "HEAD") {
+        return new Response("Method Not Allowed", { status: 405, headers: { "allow": "GET, HEAD" } });
+      }
+      const origin = url.origin;
+      const xml = `<?xml version="1.0" encoding="UTF-8"?>\n` +
+        `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">` +
+        `<url><loc>${origin}/</loc></url>` +
+        `</urlset>`;
+      return new Response(request.method === "HEAD" ? null : xml, {
+        status: 200,
+        headers: {
+          "content-type": "application/xml; charset=utf-8",
+          "cache-control": "public, max-age=3600, s-maxage=3600",
+          "x-content-type-options": "nosniff"
+        }
+      });
+    }
+    if (url.pathname === "/robots.txt") {
+      if (request.method !== "GET" && request.method !== "HEAD") {
+        return new Response("Method Not Allowed", { status: 405, headers: { "allow": "GET, HEAD" } });
+      }
+      const body = `User-agent: *\nAllow: /\nDisallow: /api/\n\nSitemap: ${url.origin}/sitemap.xml\n`;
+      return new Response(request.method === "HEAD" ? null : body, {
+        status: 200,
+        headers: {
+          "content-type": "text/plain; charset=utf-8",
+          "cache-control": "public, max-age=3600, s-maxage=3600",
+          "x-content-type-options": "nosniff"
+        }
+      });
+    }
     if (url.pathname === "/api/health") return json({ ok: true, service: "public-aparat-link-resolver" });
     if (url.pathname === "/api/search") {
       if (request.method !== "GET") return json({ error: "فقط GET پذیرفته می‌شود." }, 405);
