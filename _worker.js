@@ -94,6 +94,131 @@ async function resolveAparat(raw) {
   } catch {}
   return { title, uploader: String(uploader).slice(0, 150), thumbnail: safeThumbnail, downloads };
 }
+
+// ---- VidPik analytics + admin API (Cloudflare D1) ----
+const encoder = new TextEncoder();
+function b64url(bytes) {
+  let binary = "";
+  for (const b of bytes) binary += String.fromCharCode(b);
+  return btoa(binary).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+}
+function fromB64url(value) {
+  const s = value.replace(/-/g,"+").replace(/_/g,"/");
+  const raw = atob(s + "=".repeat((4-s.length%4)%4));
+  return Uint8Array.from(raw, c => c.charCodeAt(0));
+}
+async function hmac(secret, value) {
+  const key = await crypto.subtle.importKey("raw", encoder.encode(secret), {name:"HMAC",hash:"SHA-256"}, false, ["sign","verify"]);
+  return new Uint8Array(await crypto.subtle.sign("HMAC", key, encoder.encode(value)));
+}
+async function issueAdminToken(env) {
+  const payload = b64url(encoder.encode(JSON.stringify({role:"admin",exp:Date.now()+12*60*60*1000})));
+  const sig = b64url(await hmac(env.VIDPIK_ADMIN_SECRET, payload));
+  return payload + "." + sig;
+}
+async function validAdmin(request, env) {
+  const auth = request.headers.get("authorization") || "";
+  const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
+  if (!token || !env.VIDPIK_ADMIN_SECRET) return false;
+  const parts = token.split(".");
+  if (parts.length !== 2) return false;
+  try {
+    const expected = await hmac(env.VIDPIK_ADMIN_SECRET, parts[0]);
+    const actual = fromB64url(parts[1]);
+    if (expected.length !== actual.length) return false;
+    let diff = 0; for (let i=0;i<expected.length;i++) diff |= expected[i]^actual[i];
+    if (diff) return false;
+    const payload = JSON.parse(new TextDecoder().decode(fromB64url(parts[0])));
+    return payload.role === "admin" && payload.exp > Date.now();
+  } catch { return false; }
+}
+function getDb(env) { return env.DB || env.VIDPIK_DB || null; }
+async function recordEvent(env, type, request, extra={}) {
+  const db = getDb(env); if (!db) return;
+  try {
+    const url = new URL(request.url);
+    const ua = request.headers.get("user-agent") || "";
+    const device = /mobile|android|iphone/i.test(ua) ? "موبایل" : /ipad|tablet/i.test(ua) ? "تبلت" : "دسکتاپ";
+    const ref = request.headers.get("referer") || "";
+    let refHost = "";
+    try { refHost = ref ? new URL(ref).hostname.replace(/^www\./,"") : "مستقیم"; } catch {}
+    const country = request.cf?.country || "نامشخص";
+    const session = (request.headers.get("x-vidpik-session") || "").slice(0,80) || "anonymous";
+    await db.prepare("INSERT INTO analytics_events (event_type,page,query_text,referrer,referrer_host,country,device,session_id,created_at) VALUES (?,?,?,?,?,?,?,?,?)")
+      .bind(String(type).slice(0,40), String(extra.page||url.pathname).slice(0,200), String(extra.query||"").slice(0,180), ref.slice(0,500), refHost.slice(0,120), String(country).slice(0,8), device, session, new Date().toISOString()).run();
+  } catch (e) { /* analytics must never interrupt the public product */ }
+}
+function adminCorsHeaders(request, env) {
+  const origin = request.headers.get("origin") || "";
+  const allowed = String(env.VIDPIK_ADMIN_ORIGIN || "https://vidpik-admin.pages.dev").replace(/\/$/, "");
+  const headers = new Headers({
+    "Access-Control-Allow-Methods": "GET, POST, PUT, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Vidpik-Session",
+    "Access-Control-Max-Age": "86400",
+    "Vary": "Origin"
+  });
+  if (origin === allowed) headers.set("Access-Control-Allow-Origin", origin);
+  return headers;
+}
+function withAdminCors(response, request, env) {
+  const headers = new Headers(response.headers);
+  for (const [key, value] of adminCorsHeaders(request, env)) headers.set(key, value);
+  headers.set("Cache-Control", "no-store");
+  return new Response(response.body, {status: response.status, statusText: response.statusText, headers});
+}
+
+async function adminApi(request, env, url) {
+  const db = getDb(env);
+  if (url.pathname === "/api/admin/login" && request.method === "POST") {
+    if (!env.VIDPIK_ADMIN_PASSWORD || !env.VIDPIK_ADMIN_SECRET) return json({error:"تنظیمات رمز و کلید مدیر در Cloudflare کامل نشده است."},503);
+    let body={}; try { body=await request.json(); } catch {}
+    if (String(body.password||"").length > 200 || body.password !== env.VIDPIK_ADMIN_PASSWORD) {
+      await recordEvent(env,"admin_login_failed",request);
+      return json({error:"رمز عبور نادرست است."},401);
+    }
+    await recordEvent(env,"admin_login",request);
+    return json({token:await issueAdminToken(env),expiresIn:43200});
+  }
+  if (!(await validAdmin(request,env))) return json({error:"نشست مدیر معتبر نیست؛ دوباره وارد شو."},401);
+  if (!db) return json({error:"پایگاه داده D1 وصل نیست. طبق فایل ADMIN-SETUP-FA.txt دیتابیس را بساز و binding با نام DB اضافه کن."},503);
+  if (url.pathname === "/api/admin/stats" && request.method === "GET") {
+    const range = Math.max(1,Math.min(90,Number(url.searchParams.get("range")||7)));
+    const since = new Date(Date.now()-range*86400000).toISOString();
+    const one = async (sql,...args) => (await db.prepare(sql).bind(...args).first()) || {};
+    const total = await one("SELECT COUNT(*) total, COUNT(DISTINCT session_id) visitors FROM analytics_events WHERE created_at >= ?",since);
+    const count = async type => (await one("SELECT COUNT(*) n FROM analytics_events WHERE event_type=? AND created_at>=?",type,since)).n||0;
+    const daily = await db.prepare("SELECT substr(created_at,1,10) day, SUM(event_type='page_view') views, SUM(event_type='search') searches, SUM(event_type='resolve') resolves, SUM(event_type='download') downloads FROM analytics_events WHERE created_at>=? GROUP BY day ORDER BY day").bind(since).all();
+    const topPages = await db.prepare("SELECT page,COUNT(*) views FROM analytics_events WHERE event_type='page_view' AND created_at>=? GROUP BY page ORDER BY views DESC LIMIT 8").bind(since).all();
+    const sources = await db.prepare("SELECT referrer_host source,COUNT(*) visits FROM analytics_events WHERE created_at>=? GROUP BY source ORDER BY visits DESC LIMIT 8").bind(since).all();
+    const countries = await db.prepare("SELECT country,COUNT(*) visits FROM analytics_events WHERE created_at>=? GROUP BY country ORDER BY visits DESC LIMIT 8").bind(since).all();
+    const devices = await db.prepare("SELECT device,COUNT(*) visits FROM analytics_events WHERE created_at>=? GROUP BY device ORDER BY visits DESC").bind(since).all();
+    const recent = await db.prepare("SELECT event_type,page,query_text,referrer_host,country,device,created_at FROM analytics_events ORDER BY id DESC LIMIT 15").all();
+    return json({range,total:total.total||0,visitors:total.visitors||0,views:await count("page_view"),searches:await count("search"),resolves:await count("resolve"),downloads:await count("download"),daily:daily.results||[],topPages:topPages.results||[],sources:sources.results||[],countries:countries.results||[],devices:devices.results||[],recent:recent.results||[]});
+  }
+  if (url.pathname === "/api/admin/ads" && request.method === "GET") {
+    const rows = await db.prepare("SELECT setting_key,setting_value FROM site_settings WHERE setting_key LIKE 'ad_%'").all();
+    const out={}; for (const r of rows.results||[]) { try { out[r.setting_key.slice(3)]=JSON.parse(r.setting_value); } catch {} }
+    return json(out);
+  }
+  if (url.pathname === "/api/admin/ads" && request.method === "PUT") {
+    let body={}; try { body=await request.json(); } catch { return json({error:"داده‌های ارسالی معتبر نیست."},400); }
+    const allowed=["home","before","during"];
+    const stmts=[];
+    for (const key of allowed) {
+      const item=body[key]||{};
+      const value=JSON.stringify({text:String(item.text||"").slice(0,1000),enabled:!!item.enabled});
+      stmts.push(db.prepare("INSERT INTO site_settings(setting_key,setting_value,updated_at) VALUES(?,?,?) ON CONFLICT(setting_key) DO UPDATE SET setting_value=excluded.setting_value,updated_at=excluded.updated_at").bind("ad_"+key,value,new Date().toISOString()));
+    }
+    await db.batch(stmts);
+    return json({ok:true});
+  }
+  if (url.pathname === "/api/admin/events" && request.method === "GET") {
+    const rows=await db.prepare("SELECT event_type,page,query_text,referrer_host,country,device,created_at FROM analytics_events ORDER BY id DESC LIMIT 100").all();
+    return json({events:rows.results||[]});
+  }
+  return json({error:"مسیر مدیریت پیدا نشد."},404);
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -130,12 +255,26 @@ export default {
         }
       });
     }
+
+    if (url.pathname.startsWith("/api/admin/")) {
+      if (request.method === "OPTIONS") return new Response(null, {status:204, headers:adminCorsHeaders(request,env)});
+      const response = await adminApi(request, env, url);
+      return withAdminCors(response, request, env);
+    }
+    if (url.pathname === "/api/track" && request.method === "POST") {
+      let body={}; try { body=await request.json(); } catch {}
+      const type=String(body.type||"").slice(0,40);
+      if (!["page_view","search","resolve","download"].includes(type)) return json({error:"رویداد نامعتبر است."},400);
+      await recordEvent(env,type,request,{query:body.query||"",page:body.page||"/"});
+      return json({ok:true});
+    }
     if (url.pathname === "/api/health") return json({ ok: true, service: "public-aparat-link-resolver" });
     if (url.pathname === "/api/search") {
       if (request.method !== "GET") return json({ error: "فقط GET پذیرفته می‌شود." }, 405);
       const q = (url.searchParams.get("q") || "").trim().slice(0, 180);
       const page = Math.max(1, Math.min(20, Number.parseInt(url.searchParams.get("page") || "1", 10) || 1));
       if (!q) return json({ error: "عبارت جست‌وجو را وارد کن." }, 400);
+      await recordEvent(env,"search",request,{query:q});
       const hostOf = value => { try { return new URL(value).hostname.replace(/^www\./i, ""); } catch { return "وب"; } };
       const normalize = (list) => (Array.isArray(list) ? list : []).map(item => {
         const link = String(item.link || item.url || "");
@@ -195,6 +334,7 @@ export default {
       if (request.method !== "GET") return json({ error: "فقط درخواست GET پذیرفته می‌شود." }, 405);
       const raw = url.searchParams.get("url");
       if (!raw || raw.length > 2048) return json({ error: "لینک ویدیو را وارد کن." }, 400);
+      await recordEvent(env,"resolve",request);
       try {
         const result = await resolveAparat(raw);
         return json(result);
@@ -209,6 +349,7 @@ export default {
       if (!raw || raw.length > 4096 || !safeMediaUrl(raw)) {
         return json({ error: "لینک مستقیم و معتبر فایل ویدیویی آپارات لازم است." }, 400);
       }
+      await recordEvent(env,"download",request);
       try {
         const upstream = await fetch(raw, {
           method: request.method,
