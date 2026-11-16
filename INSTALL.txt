@@ -1,0 +1,12 @@
+VidPik API CORS fix
+
+1) In the MAIN Cloudflare Pages project (vidpik), replace the existing root _worker.js with this _worker.js.
+2) In the MAIN project, Settings > Variables and Secrets, add/update this plain-text Variable:
+   VIDPIK_ADMIN_ORIGIN = https://vidpik-admin.pages.dev
+3) Keep these Secrets in the MAIN project:
+   VIDPIK_ADMIN_PASSWORD
+   VIDPIK_ADMIN_SECRET
+4) Deploy the MAIN project again.
+5) Open https://vidpik-admin.pages.dev and use System Status > Test Connection.
+
+Do not put the secrets in the vidpik-admin project. Do not share their values.

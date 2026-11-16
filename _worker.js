@@ -268,7 +268,10 @@ export default {
       await recordEvent(env,type,request,{query:body.query||"",page:body.page||"/"});
       return json({ok:true});
     }
-    if (url.pathname === "/api/health") return json({ ok: true, service: "public-aparat-link-resolver" });
+    if (url.pathname === "/api/health") {
+      const response = json({ ok: true, service: "public-aparat-link-resolver" });
+      return withAdminCors(response, request, env);
+    }
     if (url.pathname === "/api/search") {
       if (request.method !== "GET") return json({ error: "فقط GET پذیرفته می‌شود." }, 405);
       const q = (url.searchParams.get("q") || "").trim().slice(0, 180);
