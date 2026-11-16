@@ -206,7 +206,11 @@ async function adminApi(request, env, url) {
     const stmts=[];
     for (const key of allowed) {
       const item=body[key]||{};
-      const value=JSON.stringify({text:String(item.text||"").slice(0,1000),enabled:!!item.enabled});
+      const link=String(item.url||"").trim();
+      const image=String(item.image||"").trim();
+      const validWebUrl=value=>{ if(!value)return true; try { const u=new URL(value); return u.protocol==="https:"||u.protocol==="http:"; } catch { return false; } };
+      if (!validWebUrl(link) || !validWebUrl(image)) return json({error:"آدرس لینک و تصویر باید با http:// یا https:// شروع شود."},400);
+      const value=JSON.stringify({title:String(item.title||"").slice(0,120),text:String(item.text||"").slice(0,1000),url:link,image,button:String(item.button||"مشاهده تبلیغ").slice(0,40),start:String(item.start||"").slice(0,10),end:String(item.end||"").slice(0,10),enabled:!!item.enabled});
       stmts.push(db.prepare("INSERT INTO site_settings(setting_key,setting_value,updated_at) VALUES(?,?,?) ON CONFLICT(setting_key) DO UPDATE SET setting_value=excluded.setting_value,updated_at=excluded.updated_at").bind("ad_"+key,value,new Date().toISOString()));
     }
     await db.batch(stmts);
@@ -256,6 +260,21 @@ export default {
       });
     }
 
+    if (url.pathname === "/api/ads" && request.method === "GET") {
+      const db=getDb(env);
+      if (!db) return json({ads:{}});
+      try {
+        const rows=await db.prepare("SELECT setting_key,setting_value FROM site_settings WHERE setting_key LIKE 'ad_%'").all();
+        const ads={}; const today=new Date().toISOString().slice(0,10);
+        for (const row of rows.results||[]) {
+          try {
+            const key=row.setting_key.slice(3), item=JSON.parse(row.setting_value);
+            if (item.enabled && (!item.start || item.start<=today) && (!item.end || item.end>=today)) ads[key]=item;
+          } catch {}
+        }
+        return json({ads});
+      } catch { return json({ads:{}}); }
+    }
     if (url.pathname.startsWith("/api/admin/")) {
       if (request.method === "OPTIONS") return new Response(null, {status:204, headers:adminCorsHeaders(request,env)});
       const response = await adminApi(request, env, url);
@@ -264,7 +283,7 @@ export default {
     if (url.pathname === "/api/track" && request.method === "POST") {
       let body={}; try { body=await request.json(); } catch {}
       const type=String(body.type||"").slice(0,40);
-      if (!["page_view","search","resolve","download"].includes(type)) return json({error:"رویداد نامعتبر است."},400);
+      if (!["page_view","search","resolve","download","ad_click"].includes(type)) return json({error:"رویداد نامعتبر است."},400);
       await recordEvent(env,type,request,{query:body.query||"",page:body.page||"/"});
       return json({ok:true});
     }
