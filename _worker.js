@@ -298,19 +298,25 @@ export default {
       if (!q) return json({ error: "عبارت جست‌وجو را وارد کن." }, 400);
       await recordEvent(env,"search",request,{query:q});
       const hostOf = value => { try { return new URL(value).hostname.replace(/^www\./i, ""); } catch { return "وب"; } };
+      // Only return real Aparat video pages. General Google results are not playable videos.
       const normalize = (list) => (Array.isArray(list) ? list : []).map(item => {
         const link = String(item.link || item.url || "");
-        if (!/^https?:\/\//i.test(link)) return null;
+        let parsed;
+        try { parsed = new URL(link); } catch { return null; }
+        const host = parsed.hostname.toLowerCase().replace(/^www\./, "");
+        const validHost = host === "aparat.com" || host.endsWith(".aparat.com") || host === "aparat.ir" || host.endsWith(".aparat.ir");
+        const videoPath = /^\/v\/[a-zA-Z0-9_-]{3,40}(?:\/|$)/.test(parsed.pathname);
+        if (parsed.protocol !== "https:" || !validHost || !videoPath) return null;
         let thumbnail = String(item.thumbnail || item.image || item.pagemap?.cse_thumbnail?.[0]?.src || item.pagemap?.cse_image?.[0]?.src || "");
-        try { if (!/^https?:\/\//i.test(thumbnail)) thumbnail = ""; } catch { thumbnail = ""; }
+        try { const imageUrl = new URL(thumbnail); if (imageUrl.protocol !== "https:") thumbnail = ""; else thumbnail = imageUrl.href; } catch { thumbnail = ""; }
         return {
-          title: String(item.title || "نتیجهٔ وب").slice(0, 300),
-          url: link,
+          title: String(item.title || "ویدیوی آپارات").slice(0, 300),
+          url: parsed.href,
           thumbnail,
           snippet: String(item.snippet || item.description || "").slice(0, 500),
-          uploader: hostOf(link),
-          source: hostOf(link),
-          isAparat: /(^|\.)aparat\.(com|ir)$/i.test(hostOf(link)) && /\/v\//i.test(new URL(link).pathname)
+          uploader: host,
+          source: "آپارات",
+          isAparat: true
         };
       }).filter(Boolean);
       try {
@@ -318,7 +324,7 @@ export default {
         if (env.SERPAPI_KEY) {
           const endpoint = new URL("https://serpapi.com/search.json");
           endpoint.searchParams.set("engine", "google");
-          endpoint.searchParams.set("q", q);
+          endpoint.searchParams.set("q", "site:aparat.com/v " + q);
           endpoint.searchParams.set("num", "10");
           endpoint.searchParams.set("start", String((page - 1) * 10));
           endpoint.searchParams.set("api_key", env.SERPAPI_KEY);
@@ -326,7 +332,7 @@ export default {
           const body = await upstream.json().catch(() => null);
           if (upstream.ok && body && Array.isArray(body.organic_results)) {
             const items = normalize(body.organic_results);
-            return json({ items, page, hasMore: Boolean(body.serpapi_pagination?.next), provider: "Google" });
+            return json({ items, page, hasMore: Boolean(body.serpapi_pagination?.next), provider: "ویدیوهای آپارات" });
           }
           if (upstream.status === 401 || upstream.status === 403) return json({ error: "کلید SERPAPI_KEY معتبر نیست یا سهمیهٔ جست‌وجو تمام شده است." }, 502);
         }
@@ -335,14 +341,14 @@ export default {
           const endpoint = new URL("https://www.googleapis.com/customsearch/v1");
           endpoint.searchParams.set("key", env.GOOGLE_API_KEY);
           endpoint.searchParams.set("cx", env.GOOGLE_CSE_ID);
-          endpoint.searchParams.set("q", q);
+          endpoint.searchParams.set("q", "site:aparat.com/v " + q);
           endpoint.searchParams.set("num", "10");
           endpoint.searchParams.set("start", String((page - 1) * 10 + 1));
           const upstream = await fetch(endpoint.toString(), { headers: { "accept": "application/json" } });
           const body = await upstream.json().catch(() => null);
           if (upstream.ok && body && Array.isArray(body.items)) {
             const items = normalize(body.items.map(x => ({ ...x, thumbnail: x.pagemap?.cse_thumbnail?.[0]?.src || x.pagemap?.cse_image?.[0]?.src || "" })));
-            return json({ items, page, hasMore: Boolean(body.queries?.nextPage?.length), provider: "Google" });
+            return json({ items, page, hasMore: Boolean(body.queries?.nextPage?.length), provider: "ویدیوهای آپارات" });
           }
           const message = body?.error?.message;
           return json({ error: "گوگل پاسخ جست‌وجو نداد" + (message ? ": " + String(message).slice(0, 220) : ".") }, 502);
