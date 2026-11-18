@@ -163,53 +163,89 @@ const now=Date.now(),elapsed=(now-lastSampleAt)/1000;
 if(elapsed>=0.5||force){const delta=received-lastSampleBytes;if(elapsed>0)lastSpeed=delta/elapsed;lastSampleBytes=received;lastSampleAt=now}
 const pct=total?Math.min(99,Math.floor(received/total*100)):null;
 const remaining=total&&lastSpeed>0?Math.ceil((total-received)/lastSpeed):null;
-const speedText=lastSpeed>=1024?(lastSpeed/1024).toFixed(1)+' MB/s':Math.round(lastSpeed)+' KB/s';
+const speedText=lastSpeed>=1048576?(lastSpeed/1048576).toFixed(2)+' MB/s':lastSpeed>=1024?(lastSpeed/1024).toFixed(1)+' KB/s':Math.round(lastSpeed)+' B/s';
 const etaText=remaining===null?'نامشخص':remaining<60?remaining+' ثانیه':Math.floor(remaining/60)+' دقیقه و '+(remaining%60)+' ثانیه';
 if(button)button.textContent=pct===null?formatBytes(received):pct+'٪';
 if(stats)stats.innerHTML='سرعت: <strong>'+speedText+'</strong> | زمان باقی‌مانده: <strong>'+etaText+'</strong>'+(total?' | '+formatBytes(received)+' از '+formatBytes(total):'');
 if(now-lastUpdate>1500){setStatus('دریافت ویدیو: '+formatBytes(received)+(total?' از '+formatBytes(total)+' ('+pct+'٪)':''));lastUpdate=now}
 }
-try{
-setStatus('در حال بررسی پشتیبانی سرور از دانلود چندبخشی…');
-let mime='video/mp4',parts=[],rangeSupported=false;
-const headController=makeController();
-let headResponse;
-try{headResponse=await fetch(baseUrl,{method:'HEAD',signal:headController.signal})}catch{}
-if(headResponse?.ok){
-total=Number(headResponse.headers.get('content-length'))||0;
-rangeSupported=/bytes/i.test(headResponse.headers.get('accept-ranges')||'');
-mime=headResponse.headers.get('content-type')||mime;
+async function readResponseChunks(response,onChunk){
+if(!response.body)throw new Error('مرورگر امکان دریافت جریانی این فایل را فراهم نکرد.');
+const reader=response.body.getReader(),chunks=[];
+while(true){
+await waitIfPaused();
+const {done,value}=await reader.read();
+if(done)break;
+chunks.push(value);received+=value.byteLength;updateProgress();
+if(onChunk)onChunk(value);
 }
-if(rangeSupported&&total>0){
-setStatus('سرور از دانلود چندبخشی پشتیبانی می‌کند؛ شروع دانلود موازی…');
-const chunkSize=2*1024*1024,segments=[];
+return chunks;
+}
+try{
+setStatus('در حال آزمایش پشتیبانی فایل از دانلود چندبخشی…');
+let mime='video/mp4',parts=[],rangeReady=false;
+const probeController=makeController();
+let probe;
+try{
+probe=await fetch(baseUrl,{headers:{'Range':'bytes=0-0'},signal:probeController.signal,cache:'no-store'});
+if(probe.status===206){
+const range=probe.headers.get('content-range')||'';
+const match=range.match(/^bytes\s+0-0\/(\d+)$/i);
+const firstByte=await probe.arrayBuffer();
+if(match&&firstByte.byteLength===1){
+total=Number(match[1])||0;
+rangeReady=total>1;
+mime=probe.headers.get('content-type')||mime;
+}
+}
+}catch(error){if(task.cancelled)throw error}
+if(rangeReady){
+setStatus('سرور درخواست‌های چندبخشی را می‌پذیرد؛ دانلود موازی آغاز شد…');
+const chunkSize=8*1024*1024,segments=[];
 for(let start=0;start<total;start+=chunkSize)segments.push({start,end:Math.min(total-1,start+chunkSize-1)});
-let next=0;const concurrency=Math.min(4,segments.length);
+let next=0,rangeFailed=null;
+const concurrency=Math.min(4,segments.length);
 async function rangeWorker(){
 while(true){
-await waitIfPaused();const index=next++;if(index>=segments.length)return;
+await waitIfPaused();checkCancel();
+const index=next++;if(index>=segments.length)return;
 const segment=segments[index],controller=makeController();
-const response=await fetch(baseUrl,{headers:{'Range':'bytes='+segment.start+'-'+segment.end},signal:controller.signal});
-if(response.status!==206)throw new Error('سرور فایل درخواست چندبخشی را نپذیرفت (HTTP '+response.status+').');
+const response=await fetch(baseUrl,{headers:{'Range':'bytes='+segment.start+'-'+segment.end},signal:controller.signal,cache:'no-store'});
+if(response.status!==206)throw new Error('سرور فایل را به‌صورت چندبخشی نپذیرفت (HTTP '+response.status+').');
 const contentRange=response.headers.get('content-range')||'';
-if(!contentRange.startsWith('bytes '+segment.start+'-'))throw new Error('پاسخ بخش‌بندی‌شده سرور معتبر نیست.');
-const data=await response.arrayBuffer();
-if(data.byteLength!==segment.end-segment.start+1)throw new Error('یکی از بخش‌های فایل ناقص دریافت شد.');
-parts[index]=new Uint8Array(data);received+=data.byteLength;updateProgress();
+if(!contentRange.startsWith('bytes '+segment.start+'-'+segment.end+'/'))throw new Error('پاسخ بخش‌بندی‌شده سرور معتبر نیست.');
+const chunks=await readResponseChunks(response);
+const segmentBlob=new Blob(chunks,{type:mime});
+if(segmentBlob.size!==segment.end-segment.start+1)throw new Error('یکی از بخش‌های فایل ناقص دریافت شد.');
+parts[index]=segmentBlob;
 }
 }
+try{
 await Promise.all(Array.from({length:concurrency},()=>rangeWorker()));
+}catch(error){
+if(task.cancelled)throw error;
+rangeFailed=error;
+controllers.forEach(c=>{try{c.abort()}catch{}});
+parts=[];received=0;lastSpeed=0;lastSampleBytes=0;lastSampleAt=Date.now();
+task.controllers.length=0;
+if(stats)stats.textContent='دانلود چندبخشی در این منبع پایدار نبود؛ روش سازگار جایگزین می‌شود…';
+setStatus('اتصال چندبخشی پایدار نبود؛ دانلود با یک اتصال ادامه می‌یابد.');
+}
+if(rangeFailed)rangeReady=false;
 }else{
-setStatus('سرور دانلود چندبخشی را پشتیبانی نمی‌کند؛ دانلود با یک اتصال ادامه می‌یابد.');
-const controller=makeController();const response=await fetch(baseUrl,{signal:controller.signal});
+setStatus('این منبع دانلود چندبخشی را تأیید نکرد؛ دانلود با یک اتصال انجام می‌شود.');
+}
+if(!rangeReady){
+const controller=makeController();
+const response=await fetch(baseUrl,{signal:controller.signal,cache:'no-store'});
 if(!response.ok){let message='دانلود فایل ناموفق بود (HTTP '+response.status+').';try{const data=await response.json();message=data.error||message}catch{}throw new Error(message)}
 const type=(response.headers.get('content-type')||'').toLowerCase();
 if(type.includes('text/html')||type.includes('application/json'))throw new Error('سرور به‌جای فایل ویدیو، پاسخ متنی فرستاد.');
-mime=response.headers.get('content-type')||mime;total=Number(response.headers.get('content-length'))||0;
-if(!response.body)throw new Error('مرورگر امکان دریافت جریانی این فایل را فراهم نکرد.');
-const reader=response.body.getReader();const chunks=[];
-while(true){await waitIfPaused();const {done,value}=await reader.read();if(done)break;chunks.push(value);received+=value.byteLength;updateProgress()}
-parts=chunks;
+mime=response.headers.get('content-type')||mime;
+total=Number(response.headers.get('content-length'))||total;
+parts=await readResponseChunks(response);
+}else{
+setStatus('دریافت بخش‌های ویدیو کامل شد؛ در حال آماده‌سازی فایل…');
 }
 checkCancel();updateProgress(true);
 const blob=new Blob(parts,{type:mime});if(!blob.size)throw new Error('فایل ویدیو خالی دریافت شد.');
