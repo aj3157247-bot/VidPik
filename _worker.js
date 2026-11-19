@@ -67,8 +67,11 @@ async function resolveAparat(raw) {
   const endpoint = API_BASE + encodeURIComponent(id);
   const response = await fetch(endpoint, {
     headers: {
-      "accept": "application/json, text/plain, */*",
-      "user-agent": "Mozilla/5.0 (compatible; PublicAparatLinkResolver/1.0)"
+      "accept": "*/*",
+      "accept-language": "fa-IR,fa;q=0.9,en;q=0.8",
+      "origin": "https://www.aparat.com",
+      "referer": "https://www.aparat.com/",
+      "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
     },
     redirect: "follow"
   });
@@ -351,7 +354,59 @@ export default {
         };
       }).filter(Boolean);
       try {
-        // Preferred: SerpApi provides Google web results with server-side API access.
+        // First-party Aparat search: relevance-ranked videos and channels, no Google site: restriction.
+        // Aparat's public web client currently exposes a mixed-search endpoint; only video records
+        // are returned to VidPik because channel pages are not directly playable downloads.
+        const nextToken = (url.searchParams.get("next") || "").slice(0, 2000);
+        const aparatEndpoint = new URL("https://www.aparat.com/api/v0/search/mix/" + encodeURIComponent(q));
+        if (nextToken) {
+          aparatEndpoint.searchParams.set("nextq", nextToken);
+          aparatEndpoint.searchParams.set("isnextpage", "true");
+        }
+        const aparatResponse = await fetch(aparatEndpoint.toString(), {
+          headers: {
+            "accept": "*/*",
+            "accept-language": "fa-IR,fa;q=0.9,en;q=0.8",
+            "origin": "https://www.aparat.com",
+            "referer": "https://www.aparat.com/",
+            "sec-fetch-dest": "empty",
+            "sec-fetch-mode": "cors",
+            "sec-fetch-site": "same-origin"
+          },
+          cf: { cacheTtl: 30, cacheEverything: false }
+        });
+        const aparatBody = await aparatResponse.json().catch(() => null);
+        if (aparatResponse.ok && aparatBody && !aparatBody.error) {
+          const block = aparatBody.data?.[0] || {};
+          const mixed = block.mixV2?.data || [];
+          const seen = new Set();
+          const items = mixed.filter(x => x?.type === "Video" && x?.data?.uid)
+            .map(x => {
+              const v = x.data;
+              const uid = String(v.uid);
+              if (!/^[a-zA-Z0-9_-]{3,40}$/.test(uid) || seen.has(uid)) return null;
+              seen.add(uid);
+              const candidates = [
+                v.small_poster, v.medium_poster, v.big_poster, v.poster,
+                v.thumbnail, v.image, v.pic
+              ];
+              let thumbnail = candidates.find(x => typeof x === "string" && /^https:\/\//i.test(x)) || "";
+              return {
+                title: String(v.title || "ویدیوی آپارات").slice(0, 300),
+                url: "https://www.aparat.com/v/" + uid,
+                thumbnail,
+                snippet: String(v.description || v.meta_description || "").slice(0, 500),
+                uploader: String(v.sender_name || v.username || "آپارات").slice(0, 100),
+                source: "جستجوی مستقیم آپارات",
+                isAparat: true
+              };
+            }).filter(Boolean);
+          const nextUrl = String(block.link?.next || "");
+          let next = "";
+          try { next = new URL(nextUrl, "https://www.aparat.com").searchParams.get("nextq") || ""; } catch {}
+          return json({ items, page, hasMore: Boolean(next), next, provider: "جستجوی مستقیم آپارات" });
+        }
+        // If Aparat's unofficial endpoint is temporarily unavailable, keep the existing search providers.
         if (env.SERPAPI_KEY) {
           const endpoint = new URL("https://serpapi.com/search.json");
           endpoint.searchParams.set("engine", "google");
@@ -363,11 +418,9 @@ export default {
           const body = await upstream.json().catch(() => null);
           if (upstream.ok && body && Array.isArray(body.organic_results)) {
             const items = normalize(body.organic_results);
-            return json({ items, page, hasMore: Boolean(body.serpapi_pagination?.next), provider: "ویدیوهای آپارات" });
+            return json({ items, page, hasMore: Boolean(body.serpapi_pagination?.next), next: "", provider: "جستجوی پشتیبان گوگل" });
           }
-          if (upstream.status === 401 || upstream.status === 403) return json({ error: "کلید SERPAPI_KEY معتبر نیست یا سهمیهٔ جست‌وجو تمام شده است." }, 502);
         }
-        // Google Programmable Search JSON API, for accounts that already have access.
         if (env.GOOGLE_API_KEY && env.GOOGLE_CSE_ID) {
           const endpoint = new URL("https://www.googleapis.com/customsearch/v1");
           endpoint.searchParams.set("key", env.GOOGLE_API_KEY);
@@ -379,14 +432,12 @@ export default {
           const body = await upstream.json().catch(() => null);
           if (upstream.ok && body && Array.isArray(body.items)) {
             const items = normalize(body.items.map(x => ({ ...x, thumbnail: x.pagemap?.cse_thumbnail?.[0]?.src || x.pagemap?.cse_image?.[0]?.src || "" })));
-            return json({ items, page, hasMore: Boolean(body.queries?.nextPage?.length), provider: "ویدیوهای آپارات" });
+            return json({ items, page, hasMore: Boolean(body.queries?.nextPage?.length), next: "", provider: "جستجوی پشتیبان گوگل" });
           }
-          const message = body?.error?.message;
-          return json({ error: "گوگل پاسخ جست‌وجو نداد" + (message ? ": " + String(message).slice(0, 220) : ".") }, 502);
         }
-        return json({ error: "جست‌وجوی گسترده هنوز به کلید API وصل نشده است. در Cloudflare Pages → Settings → Variables and Secrets، کلید SERPAPI_KEY را اضافه کن. راهنمای GOOGLE-SEARCH-SETUP.txt را ببین." }, 503);
+        return json({ error: "جستجوی آپارات فعلاً پاسخ نداد. چند لحظه بعد دوباره تلاش کن." }, 502);
       } catch (error) {
-        return json({ error: "اتصال به جست‌وجوی گوگل ناموفق بود. تنظیمات API و دسترسی شبکه را بررسی کن." }, 502);
+        return json({ error: "ارتباط با جستجوی آپارات ناموفق بود. اتصال اینترنت را بررسی کن و دوباره تلاش کن." }, 502);
       }
     }
     if (url.pathname === "/api/resolve") {
