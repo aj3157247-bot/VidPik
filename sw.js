@@ -1,5 +1,5 @@
 
-const CACHE_NAME = "vidpik-static-v1";
+const CACHE_NAME = "vidpik-static-v2";
 const STATIC_FILES = [
   "/",
   "/manifest.webmanifest",
