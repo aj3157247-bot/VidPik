@@ -127,7 +127,9 @@ $('menuButton').addEventListener('click',()=>{const menu=$('moreMenu');const ope
 $('heroSearchBtn').addEventListener('click',()=>runHeroSearch());$('heroSearch').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();runHeroSearch()}});function runHeroSearch(){const q=$('heroSearch').value.trim();if(!q){toast('نام فیلم یا کلمهٔ کلیدی را وارد کن.');return}showTab('searchSection');$('searchQuery').value=q;$('searchForm').requestSubmit()}
 
 const OFFLINE_DB='VidPikOfflineDB',OFFLINE_STORE='videos';
-function openOfflineDB(){return new Promise((resolve,reject)=>{const request=indexedDB.open(OFFLINE_DB,1);request.onupgradeneeded=()=>{const db=request.result;if(!db.objectStoreNames.contains(OFFLINE_STORE))db.createObjectStore(OFFLINE_STORE,{keyPath:'id'})};request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error||new Error('ذخیره‌سازی داخلی فعال نشد.'))})}
+function openOfflineDB(){return new Promise((resolve,reject)=>{const request=indexedDB.open(OFFLINE_DB,2);request.onupgradeneeded=()=>{const db=request.result;if(!db.objectStoreNames.contains(OFFLINE_STORE))db.createObjectStore(OFFLINE_STORE,{keyPath:'id'});if(!db.objectStoreNames.contains('download_parts'))db.createObjectStore('download_parts',{keyPath:'id'})};request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error||new Error('ذخیره‌سازی داخلی فعال نشد.'))})}
+function resumeKey(item){let h=2166136261;const v=String(item.source||item.url)+'|'+String(item.quality||'video');for(let i=0;i<v.length;i++){h^=v.charCodeAt(i);h=Math.imul(h,16777619)}return 'vp_resume_'+(h>>>0).toString(36)}
+async function resumeParts(mode,jobId,index,value){const db=await openOfflineDB();return new Promise((resolve,reject)=>{const tx=db.transaction('download_parts',mode==='getAll'?'readonly':'readwrite'),st=tx.objectStore('download_parts');let req,result;if(mode==='getAll'){req=st.getAll();req.onsuccess=()=>{result=(req.result||[]).filter(x=>x.jobId===jobId)}}else if(mode==='put')req=st.put({id:jobId+':'+index,jobId,index,blob:value,updatedAt:Date.now()});else if(mode==='delete')req=st.delete(jobId+':'+index);else if(mode==='clear'){const all=st.getAll();all.onsuccess=()=>{(all.result||[]).filter(x=>x.jobId===jobId).forEach(x=>st.delete(x.id))}}if(req&&mode!=='getAll')req.onerror=()=>reject(req.error||new Error('ذخیره بخش دانلود ناموفق بود.'));tx.oncomplete=()=>{db.close();resolve(result)};tx.onerror=()=>{db.close();reject(tx.error||new Error('خطای ذخیره‌سازی'))}})}
 async function offlineAction(mode,value){const db=await openOfflineDB();return new Promise((resolve,reject)=>{const tx=db.transaction(OFFLINE_STORE,mode==='get'||mode==='all'?'readonly':'readwrite'),store=tx.objectStore(OFFLINE_STORE);let req,result;if(mode==='all')req=store.getAll();else if(mode==='get')req=store.get(value);else if(mode==='delete')req=store.delete(value);else if(mode==='clear')req=store.clear();else if(mode==='put')req=store.put(value);if(req){req.onsuccess=()=>{result=req.result};req.onerror=()=>{db.close();reject(req.error||new Error('خطا در ذخیره‌سازی'))}}tx.oncomplete=()=>{db.close();resolve(result)};tx.onerror=()=>{db.close();reject(tx.error||new Error('خطا در ذخیره‌سازی'))};tx.onabort=()=>{db.close();reject(tx.error||new Error('ذخیره‌سازی لغو شد.'))}})}
 async function renderDownloads(){const box=$('downloadsList');box.replaceChildren();try{const list=await offlineAction('all');$('clearDownloads').style.display=list.length?'inline-block':'none';if(!list.length){box.innerHTML='<div class=\"empty\"><div class=\"empty-icon\">⇩</div>هنوز ویدیویی ذخیره نشده است.<br>بعد از انتخاب کیفیت، ویدیو در همین بخش ذخیره می‌شود.</div>';return}list.sort((a,b)=>b.createdAt-a.createdAt).forEach(item=>{const row=document.createElement('article');row.className='download-row';const mark=document.createElement('div');mark.className='download-mark';mark.textContent='✓';const main=document.createElement('div');main.className='row-main';const title=document.createElement('strong');title.textContent=item.title||'ویدیوی ذخیره‌شده';const small=document.createElement('small');small.textContent=(item.quality||'ویدیو')+' · '+formatBytes(item.size||0)+' · '+new Date(item.createdAt).toLocaleDateString('fa-IR');main.append(title,small);const actions=document.createElement('div');actions.className='row-actions';const play=document.createElement('button');play.className='secondary-btn';play.textContent='تماشای آفلاین';play.addEventListener('click',()=>playOffline(item.id));const remove=document.createElement('button');remove.className='delete-btn';remove.textContent='حذف';remove.addEventListener('click',async()=>{await offlineAction('delete',item.id);renderDownloads();toast('ویدیو از حافظه داخلی حذف شد.')});actions.append(play,remove);row.append(mark,main,actions);box.append(row)})}catch(error){box.innerHTML='<div class=\"empty\">ذخیره‌سازی داخلی در این مرورگر فعال نیست: '+(error.message||'خطا')+'</div>'}}
 function formatBytes(bytes){if(!bytes)return 'حجم نامشخص';const units=['B','KB','MB','GB'];let n=bytes,i=0;while(n>=1024&&i<3){n/=1024;i++}return n.toFixed(i?1:0)+' '+units[i]}
@@ -148,7 +150,8 @@ cancel.addEventListener('click',()=>{const task=taskByButton.get(button);if(!tas
 controls.append(pause,cancel);
 }else controls.remove();
 }
-function downloadItem(item,button){
+async function downloadItem(item,button){
+try{const saved=await resumeParts('getAll',resumeKey(item));if(saved.length){const bytes=saved.reduce((n,x)=>n+(x.blob?.size||0),0);toast('بخش‌های قبلی پیدا شد؛ دانلود از '+formatBytes(bytes)+' ادامه می‌یابد.')}}catch{}
 const task={button,paused:false,cancelled:false,controllers:[],waiters:[],queued:true};taskByButton.set(button,task);trackDownload('download_started',item);
 return new Promise((resolve,reject)=>{downloadQueue.push({item,button,task,resolve,reject});button.disabled=true;button.textContent='در صف دانلود…';setDownloadControls(button,'active');pumpDownloadQueue();});
 }
@@ -208,12 +211,16 @@ if(rangeReady){
 setStatus('سرور درخواست‌های چندبخشی را می‌پذیرد؛ دانلود موازی آغاز شد…');
 const chunkSize=8*1024*1024,segments=[];
 for(let start=0;start<total;start+=chunkSize)segments.push({start,end:Math.min(total-1,start+chunkSize-1)});
+const jobId=resumeKey(item),savedParts=await resumeParts('getAll',jobId);
+savedParts.forEach(saved=>{if(segments[saved.index]&&saved.blob instanceof Blob&&saved.blob.size===segments[saved.index].end-segments[saved.index].start+1){parts[saved.index]=saved.blob;received+=saved.blob.size}});
+if(received&&stats)stats.textContent='ادامه از '+formatBytes(received)+' بخش ذخیره‌شده…';
 let next=0,rangeFailed=null;
 const concurrency=Math.min(4,segments.length);
 async function rangeWorker(){
 while(true){
 await waitIfPaused();checkCancel();
 const index=next++;if(index>=segments.length)return;
+if(parts[index])continue;
 const segment=segments[index],controller=makeController();
 const response=await fetch(baseUrl,{headers:{'Range':'bytes='+segment.start+'-'+segment.end},signal:controller.signal,cache:'no-store'});
 if(response.status!==206)throw new Error('سرور فایل را به‌صورت چندبخشی نپذیرفت (HTTP '+response.status+').');
@@ -223,22 +230,23 @@ const chunks=await readResponseChunks(response);
 const segmentBlob=new Blob(chunks,{type:mime});
 if(segmentBlob.size!==segment.end-segment.start+1)throw new Error('یکی از بخش‌های فایل ناقص دریافت شد.');
 parts[index]=segmentBlob;
+await resumeParts('put',jobId,index,segmentBlob);
 }
 }
 try{
 await Promise.all(Array.from({length:concurrency},()=>rangeWorker()));
 }catch(error){
-if(task.cancelled)throw error;
+if(task.cancelled||error?.name==='AbortError')throw error;
 rangeFailed=error;
 controllers.forEach(c=>{try{c.abort()}catch{}});
-parts=[];received=0;lastSpeed=0;lastSampleBytes=0;lastSampleAt=Date.now();
+parts=[];received=0;await resumeParts('clear',jobId);lastSpeed=0;lastSampleBytes=0;lastSampleAt=Date.now();
 task.controllers.length=0;
 if(stats)stats.textContent='دانلود چندبخشی در این منبع پایدار نبود؛ روش سازگار جایگزین می‌شود…';
-setStatus('اتصال چندبخشی پایدار نبود؛ دانلود با یک اتصال ادامه می‌یابد.');
+setStatus('اتصال چندبخشی پایدار نبود؛ ادامه از بخش ذخیره‌شده ممکن نیست و دانلود از ابتدا انجام می‌شود.');
 }
 if(rangeFailed)rangeReady=false;
 }else{
-setStatus('این منبع دانلود چندبخشی را تأیید نکرد؛ دانلود با یک اتصال انجام می‌شود.');
+setStatus('این منبع ادامه‌دادن دانلود پس از خروج را پشتیبانی نمی‌کند؛ دانلود تک‌اتصالی است.');
 }
 if(!rangeReady){
 const controller=makeController();
@@ -254,6 +262,7 @@ setStatus('دریافت بخش‌های ویدیو کامل شد؛ در حال �
 }
 checkCancel();updateProgress(true);
 const blob=new Blob(parts,{type:mime});if(!blob.size)throw new Error('فایل ویدیو خالی دریافت شد.');
+if(rangeReady)await resumeParts('clear',resumeKey(item));
 const record={id:Date.now().toString(36)+Math.random().toString(36).slice(2,8),title:item.title||'ویدیوی آپارات',uploader:item.uploader||'',source:item.source||'',quality:item.quality||'ویدیو',blob,size:blob.size,createdAt:Date.now(),type:blob.type||'video/mp4'};
 await offlineAction('put',record);await renderDownloads();trackDownload('download_complete',item);setStatus('دانلود کامل شد و ویدیو در حافظه داخلی VidPik ذخیره شد.');toast('ویدیو به بخش دانلودهای داخلی اضافه شد.');showTab('downloadsSection');
 }catch(error){
