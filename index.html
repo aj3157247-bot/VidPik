@@ -134,6 +134,7 @@ function formatBytes(bytes){if(!bytes)return 'حجم نامشخص';const units=[
 async function playOffline(id){try{const item=await offlineAction('get',id);if(!item||!item.blob)throw new Error('فایل ذخیره‌شده پیدا نشد.');showTab('linkSection');aparatFrame.hidden=true;aparatFrame.removeAttribute('src');player.pause();if(player.dataset.offlineUrl)URL.revokeObjectURL(player.dataset.offlineUrl);const objectUrl=URL.createObjectURL(item.blob);player.dataset.offlineUrl=objectUrl;player.src=objectUrl;player.hidden=false;player.load();titleBox.textContent=item.title||'ویدیوی آفلاین';uploaderBox.textContent='پخش آفلاین از حافظه داخلی VidPik';result.style.display='block';result.scrollIntoView({behavior:'smooth',block:'start'})}catch(error){toast(error.message||'پخش آفلاین ناموفق بود.')}}
 $('clearDownloads').addEventListener('click',async()=>{if(confirm('تمام ویدیوهای ذخیره‌شده از حافظه داخلی حذف شوند؟')){await offlineAction('clear');renderDownloads();toast('تمام ویدیوهای ذخیره‌شده حذف شدند.')}});
 let activeDownload=null;
+function trackDownload(type,item){try{let sid=localStorage.getItem('vp_analytics_sid');if(!sid){sid=crypto.randomUUID?crypto.randomUUID():Date.now().toString(36);localStorage.setItem('vp_analytics_sid',sid)}fetch('/api/track',{method:'POST',headers:{'content-type':'application/json','x-vidpik-session':sid},keepalive:true,body:JSON.stringify({type,query:item?.quality||''})}).catch(()=>{})}catch{}}
 function setDownloadControls(button,mode){
 const host=button.parentElement;let controls=host.querySelector('.download-controls');
 if(!controls){controls=document.createElement('div');controls.className='download-controls';host.append(controls)}
@@ -148,7 +149,7 @@ controls.append(pause,cancel);
 }
 async function downloadItem(item,button){
 if(activeDownload){toast('یک دانلود دیگر در حال اجرا است؛ ابتدا آن را لغو یا تمام کن.');return}
-const task={button,paused:false,cancelled:false,controllers:[],waiters:[]};activeDownload=task;
+const task={button,paused:false,cancelled:false,controllers:[],waiters:[]};activeDownload=task;trackDownload('download_started',item);
 const oldText=button?.textContent||'';let stats=button?.parentElement.querySelector('.download-live-stats');
 if(!stats&&button){stats=document.createElement('div');stats.className='download-live-stats';button.parentElement.append(stats)}
 if(button){button.disabled=true;button.textContent='در حال اتصال…';setDownloadControls(button,'active')}
@@ -250,10 +251,10 @@ setStatus('دریافت بخش‌های ویدیو کامل شد؛ در حال �
 checkCancel();updateProgress(true);
 const blob=new Blob(parts,{type:mime});if(!blob.size)throw new Error('فایل ویدیو خالی دریافت شد.');
 const record={id:Date.now().toString(36)+Math.random().toString(36).slice(2,8),title:item.title||'ویدیوی آپارات',uploader:item.uploader||'',source:item.source||'',quality:item.quality||'ویدیو',blob,size:blob.size,createdAt:Date.now(),type:blob.type||'video/mp4'};
-await offlineAction('put',record);await renderDownloads();setStatus('دانلود کامل شد و ویدیو در حافظه داخلی VidPik ذخیره شد.');toast('ویدیو به بخش دانلودهای داخلی اضافه شد.');showTab('downloadsSection');
+await offlineAction('put',record);await renderDownloads();trackDownload('download_complete',item);setStatus('دانلود کامل شد و ویدیو در حافظه داخلی VidPik ذخیره شد.');toast('ویدیو به بخش دانلودهای داخلی اضافه شد.');showTab('downloadsSection');
 }catch(error){
-if(error.name==='AbortError'||task.cancelled){setStatus('دانلود لغو شد.');toast('دانلود لغو شد.')}
-else{setStatus(error.message||'دانلود و ذخیره‌سازی ناموفق بود.',true);toast(error.message||'دانلود ناموفق بود.')}
+if(error.name==='AbortError'||task.cancelled){trackDownload('download_cancelled',item);setStatus('دانلود لغو شد.');toast('دانلود لغو شد.')}
+else{trackDownload('download_failed',item);setStatus(error.message||'دانلود و ذخیره‌سازی ناموفق بود.',true);toast(error.message||'دانلود ناموفق بود.')}
 }finally{
 controllers.forEach(c=>{try{c.abort()}catch{}});
 if(button){button.disabled=false;button.textContent=oldText;setDownloadControls(button,'idle');const live=button.parentElement.querySelector('.download-live-stats');if(live)live.remove()}

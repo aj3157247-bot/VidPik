@@ -154,6 +154,7 @@ function adminCorsHeaders(request, env) {
   const headers = new Headers({
     "Access-Control-Allow-Methods": "GET, POST, PUT, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Vidpik-Session",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Vidpik-Session",
     "Access-Control-Max-Age": "86400",
     "Vary": "Origin"
   });
@@ -181,6 +182,20 @@ async function adminApi(request, env, url) {
   }
   if (!(await validAdmin(request,env))) return json({error:"نشست مدیر معتبر نیست؛ دوباره وارد شو."},401);
   if (!db) return json({error:"پایگاه داده D1 وصل نیست. طبق فایل ADMIN-SETUP-FA.txt دیتابیس را بساز و binding با نام DB اضافه کن."},503);
+  if (url.pathname === "/api/admin/upload-image" && request.method === "POST") {
+    const bucket=env.VIDPIK_MEDIA;
+    if(!bucket) return json({error:"فضای ذخیره‌سازی R2 وصل نیست؛ binding با نام VIDPIK_MEDIA لازم است."},503);
+    let form; try{form=await request.formData()}catch{return json({error:"فرم آپلود معتبر نیست."},400)}
+    const file=form.get("file");
+    if(!file || typeof file.arrayBuffer!=="function") return json({error:"تصویری انتخاب نشده است."},400);
+    const types={"image/jpeg":"jpg","image/png":"png","image/webp":"webp","image/gif":"gif"};
+    if(!types[file.type] || file.size>5*1024*1024) return json({error:"فقط تصویر JPG، PNG، WebP یا GIF تا ۵ مگابایت مجاز است."},400);
+    const key=`ads/${Date.now()}-${crypto.randomUUID()}.${types[file.type]}`;
+    await bucket.put(key,await file.arrayBuffer(),{httpMetadata:{contentType:file.type,cacheControl:"public, max-age=31536000, immutable"}});
+    const base=String(env.VIDPIK_MEDIA_PUBLIC_URL||"").replace(/\/$/,"");
+    if(!base) return json({error:"متغیر VIDPIK_MEDIA_PUBLIC_URL برای دامنه عمومی R2 تنظیم نشده است."},503);
+    return json({ok:true,url:base+"/"+key});
+  }
   if (url.pathname === "/api/admin/stats" && request.method === "GET") {
     const range = Math.max(1,Math.min(90,Number(url.searchParams.get("range")||7)));
     const since = new Date(Date.now()-range*86400000).toISOString();
@@ -193,7 +208,7 @@ async function adminApi(request, env, url) {
     const countries = await db.prepare("SELECT country,COUNT(*) visits FROM analytics_events WHERE created_at>=? GROUP BY country ORDER BY visits DESC LIMIT 8").bind(since).all();
     const devices = await db.prepare("SELECT device,COUNT(*) visits FROM analytics_events WHERE created_at>=? GROUP BY device ORDER BY visits DESC").bind(since).all();
     const recent = await db.prepare("SELECT event_type,page,query_text,referrer_host,country,device,created_at FROM analytics_events ORDER BY id DESC LIMIT 15").all();
-    return json({range,total:total.total||0,visitors:total.visitors||0,views:await count("page_view"),searches:await count("search"),resolves:await count("resolve"),downloads:await count("download"),daily:daily.results||[],topPages:topPages.results||[],sources:sources.results||[],countries:countries.results||[],devices:devices.results||[],recent:recent.results||[]});
+    return json({range,total:total.total||0,visitors:total.visitors||0,views:await count("page_view"),searches:await count("search"),resolves:await count("resolve"),downloads:await count("download_started"),downloadCompleted:await count("download_complete"),downloadIncomplete:(await count("download_failed"))+(await count("download_cancelled")),daily:daily.results||[],topPages:topPages.results||[],sources:sources.results||[],countries:countries.results||[],devices:devices.results||[],recent:recent.results||[]});
   }
   if (url.pathname === "/api/admin/ads" && request.method === "GET") {
     const rows = await db.prepare("SELECT setting_key,setting_value FROM site_settings WHERE setting_key LIKE 'ad_%'").all();
@@ -283,7 +298,7 @@ export default {
     if (url.pathname === "/api/track" && request.method === "POST") {
       let body={}; try { body=await request.json(); } catch {}
       const type=String(body.type||"").slice(0,40);
-      if (!["page_view","search","resolve","download","ad_click"].includes(type)) return json({error:"رویداد نامعتبر است."},400);
+      if (!["page_view","search","resolve","download","download_started","download_complete","download_failed","download_cancelled","ad_click"].includes(type)) return json({error:"رویداد نامعتبر است."},400);
       await recordEvent(env,type,request,{query:body.query||"",page:body.page||"/"});
       return json({ok:true});
     }
