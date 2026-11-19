@@ -214,13 +214,14 @@ try{await probe.body?.cancel()}catch{}
 }catch(error){if(task.cancelled)throw error}
 if(rangeReady){
 setStatus('سرور درخواست‌های چندبخشی را می‌پذیرد؛ دانلود موازی آغاز شد…');
-const chunkSize=8*1024*1024,segments=[];
+// Smaller ranges reduce memory pressure on Android phones and allow faster recovery.
+const chunkSize=4*1024*1024,segments=[];
 for(let start=0;start<total;start+=chunkSize)segments.push({start,end:Math.min(total-1,start+chunkSize-1)});
 const jobId=resumeKey(item),savedParts=await resumeParts('getAll',jobId);
 savedParts.forEach(saved=>{if(segments[saved.index]&&saved.blob instanceof Blob&&saved.blob.size===segments[saved.index].end-segments[saved.index].start+1){parts[saved.index]=saved.blob;received+=saved.blob.size}});
 if(received&&stats)stats.textContent='ادامه از '+formatBytes(received)+' بخش ذخیره‌شده…';
 let next=0,rangeFailed=null;
-const concurrency=Math.min(3,segments.length);
+const concurrency=Math.min(4,segments.length);
 async function rangeWorker(){
 while(true){
 await waitIfPaused();checkCancel();
@@ -228,39 +229,27 @@ const index=next++;if(index>=segments.length)return;
 if(parts[index])continue;
 const segment=segments[index];
 let segmentBlob=null,lastError=null;
-// A temporary failure on one range must not immediately cancel every other part.
-// Retry the same part up to three times before switching to the safe fallback.
-for(let attempt=1;attempt<=3&&!segmentBlob;attempt++){
-  const controller=makeController();
+// Retry this segment alone; do not cancel successful segments when the source has a brief hiccup.
+for(let attempt=0;attempt<3&&!segmentBlob;attempt++){
   let attemptBytes=0;
+  const controller=makeController();
   try{
     const response=await fetch(baseUrl,{headers:{'Range':'bytes='+segment.start+'-'+segment.end},signal:controller.signal,cache:'no-store'});
     if(response.status!==206)throw new Error('سرور فایل را به‌صورت چندبخشی نپذیرفت (HTTP '+response.status+').');
     const contentRange=response.headers.get('content-range')||'';
     if(!contentRange.startsWith('bytes '+segment.start+'-'+segment.end+'/'))throw new Error('پاسخ بخش‌بندی‌شده سرور معتبر نیست.');
-    if(!response.body)throw new Error('جریان دریافت این بخش در دسترس نیست.');
-    const reader=response.body.getReader(),chunks=[];
-    while(true){
-      await waitIfPaused();
-      const part=await reader.read();
-      if(part.done)break;
-      chunks.push(part.value);
-      attemptBytes+=part.value.byteLength;
-      received+=part.value.byteLength;
-      updateProgress();
-    }
+    const chunks=await readResponseChunks(response,value=>{attemptBytes+=value.byteLength});
     const candidate=new Blob(chunks,{type:mime});
     if(candidate.size!==segment.end-segment.start+1)throw new Error('یکی از بخش‌های فایل ناقص دریافت شد.');
     segmentBlob=candidate;
   }catch(error){
-    received=Math.max(0,received-attemptBytes);
-    updateProgress(true);
     lastError=error;
-    if(task.cancelled||error?.name==='AbortError')throw error;
-    if(attempt<3)await new Promise(resolve=>setTimeout(resolve,500*attempt));
+    if(attemptBytes){received=Math.max(0,received-attemptBytes);updateProgress(true)}
+    if(task.cancelled)throw error;
+    if(attempt<2){if(stats)stats.textContent='اتصال ناپایدار است؛ تلاش مجدد برای یک بخش ('+(attempt+2)+'/3)…';await new Promise(resolve=>setTimeout(resolve,500*(attempt+1)))}
   }
 }
-if(!segmentBlob)throw lastError||new Error('دریافت بخشی از فایل پس از چند تلاش ناموفق بود.');
+if(!segmentBlob)throw lastError||new Error('دریافت این بخش پس از چند تلاش ناموفق بود.');
 parts[index]=segmentBlob;
 await resumeParts('put',jobId,index,segmentBlob);
 }
