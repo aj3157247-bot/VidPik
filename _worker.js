@@ -145,7 +145,7 @@ async function recordEvent(env, type, request, extra={}) {
     const country = request.cf?.country || "نامشخص";
     const session = (request.headers.get("x-vidpik-session") || "").slice(0,80) || "anonymous";
     await db.prepare("INSERT INTO analytics_events (event_type,page,query_text,referrer,referrer_host,country,device,session_id,created_at) VALUES (?,?,?,?,?,?,?,?,?)")
-      .bind(String(type).slice(0,40), String(extra.page||url.pathname).slice(0,200), String(extra.query||"").slice(0,180), ref.slice(0,500), refHost.slice(0,120), String(country).slice(0,8), device, session, new Date().toISOString()).run();
+      .bind(String(type).slice(0,40), String(extra.page||url.pathname).slice(0,200), String(type.startsWith("download_") && extra.downloadId ? JSON.stringify({id:String(extra.downloadId).slice(0,80),title:String(extra.title||"").slice(0,180),quality:String(extra.quality||"").slice(0,60)}) : (extra.query||"")).slice(0,400), ref.slice(0,500), refHost.slice(0,120), String(country).slice(0,8), device, session, new Date().toISOString()).run();
   } catch (e) { /* analytics must never interrupt the public product */ }
 }
 function adminCorsHeaders(request, env) {
@@ -200,15 +200,31 @@ async function adminApi(request, env, url) {
     const range = Math.max(1,Math.min(90,Number(url.searchParams.get("range")||7)));
     const since = new Date(Date.now()-range*86400000).toISOString();
     const one = async (sql,...args) => (await db.prepare(sql).bind(...args).first()) || {};
-    const total = await one("SELECT COUNT(*) total, COUNT(DISTINCT session_id) visitors FROM analytics_events WHERE created_at >= ?",since);
     const count = async type => (await one("SELECT COUNT(*) n FROM analytics_events WHERE event_type=? AND created_at>=?",type,since)).n||0;
-    const daily = await db.prepare("SELECT substr(created_at,1,10) day, SUM(event_type='page_view') views, SUM(event_type='search') searches, SUM(event_type='resolve') resolves, SUM(event_type='download') downloads FROM analytics_events WHERE created_at>=? GROUP BY day ORDER BY day").bind(since).all();
+    const total = await one("SELECT COUNT(*) total, COUNT(DISTINCT session_id) visitors FROM analytics_events WHERE created_at >= ?",since);
+    const daily = await db.prepare("SELECT substr(created_at,1,10) day, SUM(event_type='page_view') views, SUM(event_type='search') searches, SUM(event_type='resolve') resolves, SUM(event_type='download_started') downloadStarted, SUM(event_type='download_complete') downloadCompleted, SUM(event_type='download_paused') downloadPaused, SUM(event_type='download_cancelled') downloadCancelled, SUM(event_type='download_failed') downloadFailed FROM analytics_events WHERE created_at>=? GROUP BY day ORDER BY day").bind(since).all();
     const topPages = await db.prepare("SELECT page,COUNT(*) views FROM analytics_events WHERE event_type='page_view' AND created_at>=? GROUP BY page ORDER BY views DESC LIMIT 8").bind(since).all();
     const sources = await db.prepare("SELECT referrer_host source,COUNT(*) visits FROM analytics_events WHERE created_at>=? GROUP BY source ORDER BY visits DESC LIMIT 8").bind(since).all();
     const countries = await db.prepare("SELECT country,COUNT(*) visits FROM analytics_events WHERE created_at>=? GROUP BY country ORDER BY visits DESC LIMIT 8").bind(since).all();
     const devices = await db.prepare("SELECT device,COUNT(*) visits FROM analytics_events WHERE created_at>=? GROUP BY device ORDER BY visits DESC").bind(since).all();
-    const recent = await db.prepare("SELECT event_type,page,query_text,referrer_host,country,device,created_at FROM analytics_events ORDER BY id DESC LIMIT 15").all();
-    return json({range,total:total.total||0,visitors:total.visitors||0,views:await count("page_view"),searches:await count("search"),resolves:await count("resolve"),downloads:await count("download_started"),downloadCompleted:await count("download_complete"),downloadIncomplete:(await count("download_failed"))+(await count("download_cancelled")),daily:daily.results||[],topPages:topPages.results||[],sources:sources.results||[],countries:countries.results||[],devices:devices.results||[],recent:recent.results||[]});
+    const topSearches = await db.prepare("SELECT query_text query,COUNT(*) searches,MAX(created_at) lastSeen FROM analytics_events WHERE event_type='search' AND created_at>=? AND TRIM(query_text)<>'' GROUP BY query_text ORDER BY searches DESC,lastSeen DESC LIMIT 30").bind(since).all();
+    const latestSearches = await db.prepare("SELECT query_text query,country,device,created_at FROM analytics_events WHERE event_type='search' AND created_at>=? ORDER BY id DESC LIMIT 50").bind(since).all();
+    const latestDownloads = await db.prepare("SELECT event_type,query_text,session_id,created_at FROM analytics_events WHERE event_type LIKE 'download_%' AND created_at>=? ORDER BY id DESC LIMIT 2000").bind(since).all();
+    const activeById = new Map();
+    for (const row of latestDownloads.results||[]) {
+      let meta={}; try{meta=JSON.parse(row.query_text||"{}")}catch{}
+      const id=meta.id ? row.session_id+":"+meta.id : row.session_id+":"+row.query_text;
+      if(!activeById.has(id)) activeById.set(id,{...row,meta});
+    }
+    const states=[...activeById.values()];
+    const activeCutoff=Date.now()-6*60*60*1000;
+    const downloadActive=states.filter(x=>["download_started","download_resumed"].includes(x.event_type) && Date.parse(x.created_at)>=activeCutoff).length;
+    const downloadPaused=states.filter(x=>x.event_type==="download_paused").length;
+    const downloadCompleted=await count("download_complete");
+    const downloadCancelled=await count("download_cancelled");
+    const downloadFailed=await count("download_failed");
+    const recent = await db.prepare("SELECT event_type,page,query_text,referrer_host,country,device,created_at FROM analytics_events ORDER BY id DESC LIMIT 30").all();
+    return json({range,total:total.total||0,visitors:total.visitors||0,views:await count("page_view"),searches:await count("search"),resolves:await count("resolve"),downloads:(await one("SELECT COUNT(*) n FROM analytics_events WHERE event_type IN ('download_started','download') AND created_at>=?",since)).n||0,downloadCompleted,downloadPaused,downloadActive,downloadCancelled,downloadFailed,downloadIncomplete:downloadCancelled+downloadFailed,daily:daily.results||[],topPages:topPages.results||[],sources:sources.results||[],countries:countries.results||[],devices:devices.results||[],topSearches:topSearches.results||[],latestSearches:latestSearches.results||[],recent:recent.results||[]});
   }
   if (url.pathname === "/api/admin/ads" && request.method === "GET") {
     const rows = await db.prepare("SELECT setting_key,setting_value FROM site_settings WHERE setting_key LIKE 'ad_%'").all();
@@ -298,7 +314,7 @@ export default {
     if (url.pathname === "/api/track" && request.method === "POST") {
       let body={}; try { body=await request.json(); } catch {}
       const type=String(body.type||"").slice(0,40);
-      if (!["page_view","search","resolve","download","download_started","download_complete","download_failed","download_cancelled","ad_click"].includes(type)) return json({error:"رویداد نامعتبر است."},400);
+      if (!["page_view","search","resolve","download","download_started","download_complete","download_failed","download_cancelled","download_paused","download_resumed","ad_click"].includes(type)) return json({error:"رویداد نامعتبر است."},400);
       await recordEvent(env,type,request,{query:body.query||"",page:body.page||"/"});
       return json({ok:true});
     }
