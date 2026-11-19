@@ -205,17 +205,22 @@ total=Number(match[1])||0;
 rangeReady=total>1;
 mime=probe.headers.get('content-type')||mime;
 }
+}else{
+// Some media hosts ignore Range and return the entire movie with HTTP 200.
+// Cancel that probe immediately; otherwise the browser may download the movie
+// once in the background and then request it again for the real download.
+try{await probe.body?.cancel()}catch{}
 }
 }catch(error){if(task.cancelled)throw error}
 if(rangeReady){
 setStatus('سرور درخواست‌های چندبخشی را می‌پذیرد؛ دانلود موازی آغاز شد…');
-const chunkSize=8*1024*1024,segments=[];
+const chunkSize=16*1024*1024,segments=[];
 for(let start=0;start<total;start+=chunkSize)segments.push({start,end:Math.min(total-1,start+chunkSize-1)});
 const jobId=resumeKey(item),savedParts=await resumeParts('getAll',jobId);
 savedParts.forEach(saved=>{if(segments[saved.index]&&saved.blob instanceof Blob&&saved.blob.size===segments[saved.index].end-segments[saved.index].start+1){parts[saved.index]=saved.blob;received+=saved.blob.size}});
 if(received&&stats)stats.textContent='ادامه از '+formatBytes(received)+' بخش ذخیره‌شده…';
 let next=0,rangeFailed=null;
-const concurrency=Math.min(4,segments.length);
+const concurrency=Math.min(2,segments.length);
 async function rangeWorker(){
 while(true){
 await waitIfPaused();checkCancel();
