@@ -5,7 +5,7 @@
  */
 const API_BASE = "https://www.aparat.com/api/fa/v1/video/video/show/videohash/";
 const ALLOWED_PAGE_HOSTS = new Set(["aparat.com", "www.aparat.com", "m.aparat.com"]);
-const ALLOWED_MEDIA_HOST_RE = /(^|\.)asset\.aparat\.com$/i;
+const ALLOWED_MEDIA_HOST_RE = /(^|\.)(asset|cdn)\.aparat\.(com|ir)$/i;
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
@@ -41,7 +41,7 @@ function normalizeDownloads(attrs) {
   if (Array.isArray(all)) {
     for (const item of all) {
       const quality = item?.profile || item?.quality || item?.label || "";
-      const urls = Array.isArray(item?.urls) ? item.urls : [];
+      const urls = Array.isArray(item?.urls) ? item.urls : (item?.url ? [item.url] : []);
       for (const raw of urls) {
         if (typeof raw === "string" && safeMediaUrl(raw)) {
           candidates.push({ quality: String(quality || "ویدیو"), url: raw });
@@ -49,11 +49,29 @@ function normalizeDownloads(attrs) {
       }
     }
   }
-  // Some API responses expose a single download_link instead.
-  if (typeof attrs?.download_link === "string" && safeMediaUrl(attrs.download_link)) {
-    candidates.push({ quality: attrs?.profile || "کیفیت موجود", url: attrs.download_link });
+  for (const key of ["file_link", "download_link"]) {
+    const raw = attrs?.[key];
+    if (typeof raw === "string" && safeMediaUrl(raw)) {
+      candidates.push({ quality: String(attrs?.profile || "کیفیت موجود"), url: raw });
+    }
   }
-  // Remove duplicate URLs and sort low-to-high when labels contain resolution.
+  // Newer Aparat responses may expose download_links or player multiSRC instead.
+  for (const key of ["download_links", "multiSRC", "sources"]) {
+    const list = attrs?.[key];
+    if (!Array.isArray(list)) continue;
+    for (const entry of list) {
+      const items = Array.isArray(entry) ? entry : [entry];
+      for (const item of items) {
+        const raw = typeof item === "string" ? item : (item?.url || item?.src);
+        if (typeof raw === "string" && safeMediaUrl(raw)) {
+          candidates.push({
+            quality: String(item?.quality || item?.profile || item?.label || "کیفیت موجود"),
+            url: raw
+          });
+        }
+      }
+    }
+  }
   const unique = [...new Map(candidates.map(x => [x.url, x])).values()];
   unique.sort((a, b) => {
     const ra = Number((a.quality.match(/\d{3,4}/) || [0])[0]);
@@ -64,29 +82,50 @@ function normalizeDownloads(attrs) {
 }
 async function resolveAparat(raw) {
   const id = getVideoId(raw);
-  const endpoint = API_BASE + encodeURIComponent(id);
-  const response = await fetch(endpoint, {
-    headers: {
-      "accept": "*/*",
-      "accept-language": "fa-IR,fa;q=0.9,en;q=0.8",
-      "origin": "https://www.aparat.com",
-      "referer": "https://www.aparat.com/",
-      "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
-    },
-    redirect: "follow"
-  });
-  if (!response.ok) {
-    if (response.status === 404) throw new Error("ویدیو پیدا نشد یا API آپارات آن را در دسترس قرار نمی‌دهد.");
-    if (response.status === 403 || response.status === 401) throw new Error("آپارات دسترسی به اطلاعات این ویدیو را محدود کرده است.");
-    throw new Error("آپارات پاسخ موفق نداد (HTTP " + response.status + "). کمی بعد دوباره امتحان کن.");
+  const endpoints = [
+    API_BASE + encodeURIComponent(id),
+    "https://www.aparat.com/etc/api/video/videohash/" + encodeURIComponent(id)
+  ];
+  let attrs = null;
+  let lastStatus = 0;
+  for (const endpoint of endpoints) {
+    try {
+      const response = await fetch(endpoint, {
+        headers: {
+          "accept": "application/json, text/plain, */*",
+          "accept-language": "fa-IR,fa;q=0.9,en;q=0.8",
+          "origin": "https://www.aparat.com",
+          "referer": "https://www.aparat.com/",
+          "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
+        },
+        redirect: "follow"
+      });
+      lastStatus = response.status;
+      if (!response.ok) continue;
+      const body = await response.json().catch(() => null);
+      attrs = body?.data?.attributes || body?.data || body?.attributes ||
+        body?.video?.attributes || body?.video || null;
+      if (attrs && typeof attrs === "object") break;
+    } catch (_) {}
   }
-  const body = await response.json().catch(() => null);
-  const attrs = body?.data?.attributes || body?.data || body?.attributes;
-  if (!attrs || typeof attrs !== "object") throw new Error("ساختار پاسخ آپارات تغییر کرده یا اطلاعات ویدیو در دسترس نیست.");
+
+  // The embedded Aparat player can still work when its metadata/download API is unavailable.
+  const embedUrl = "https://www.aparat.com/video/video/embed/videohash/" +
+    encodeURIComponent(id) + "/vt/frame";
+  if (!attrs) {
+    return {
+      title: "ویدیوی آپارات",
+      uploader: "",
+      thumbnail: "",
+      downloads: [],
+      embedUrl,
+      warning: lastStatus === 404
+        ? "اطلاعات دانلود از API آپارات دریافت نشد؛ پخش‌کنندهٔ رسمی امتحان می‌شود."
+        : "API دریافت کیفیت‌ها پاسخ نداد؛ پخش‌کنندهٔ رسمی امتحان می‌شود."
+    };
+  }
+
   const downloads = normalizeDownloads(attrs);
-  if (!downloads.length) {
-    throw new Error("لینک فایل مستقیم پیدا نشد. این ویدیو ممکن است فقط پخش آنلاین داشته باشد یا آپارات دریافت فایل را محدود کرده باشد.");
-  }
   const title = String(attrs.title || attrs.name || "ویدیوی آپارات").slice(0, 300);
   const uploader = attrs.username || attrs.sender_name || attrs.owner?.name || attrs.uploader?.name || "";
   const thumbnail = attrs.big_poster || attrs.small_poster || attrs.poster || attrs.thumbnail || "";
@@ -95,7 +134,14 @@ async function resolveAparat(raw) {
     const t = new URL(thumbnail);
     if (t.protocol === "https:" && /(^|\.)asset\.aparat\.com$/i.test(t.hostname)) safeThumbnail = t.href;
   } catch {}
-  return { title, uploader: String(uploader).slice(0, 150), thumbnail: safeThumbnail, downloads };
+  return {
+    title,
+    uploader: String(uploader).slice(0, 150),
+    thumbnail: safeThumbnail,
+    downloads,
+    embedUrl,
+    warning: downloads.length ? "" : "پخش‌کنندهٔ رسمی در دسترس است، اما لینک دانلود مستقیم از API دریافت نشد."
+  };
 }
 
 // ---- VidPik analytics + admin API (Cloudflare D1) ----
