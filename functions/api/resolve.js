@@ -100,6 +100,22 @@ function extractDownloads(attributes) {
       });
     }
   }
+  for (const key of ["download_links", "multiSRC", "sources"]) {
+    const list = attributes?.[key];
+    if (!Array.isArray(list)) continue;
+    for (const entry of list) {
+      const items = Array.isArray(entry) ? entry : [entry];
+      for (const item of items) {
+        const url = typeof item === "string" ? item : (item?.url || item?.src);
+        if (typeof url === "string" && validMediaUrl(url)) {
+          downloads.push({
+            quality: String(item?.quality || item?.profile || item?.label || "کیفیت موجود"),
+            url
+          });
+        }
+      }
+    }
+  }
 
   return [...new Map(
     downloads.map(item => [item.url, item])
@@ -218,75 +234,73 @@ export async function onRequestGet({ request }) {
   }
 
   try {
-    const response = await fetch(
+    let attributes = null;
+    for (const endpoint of [
       API_BASE + encodeURIComponent(id),
-      {
-        headers: {
-          "accept": "application/json",
-          "user-agent": "Mozilla/5.0"
-        }
-      }
-    );
-
-    if (!response.ok) {
-      return json({
-        error: "آپارات اطلاعات ویدیو را ارائه نکرد: HTTP " +
-          response.status
-      }, 502);
+      "https://www.aparat.com/etc/api/video/videohash/" + encodeURIComponent(id)
+    ]) {
+      try {
+        const response = await fetch(endpoint, {
+          headers: {
+            "accept": "application/json, text/plain, */*",
+            "accept-language": "fa-IR,fa;q=0.9,en;q=0.8",
+            "origin": "https://www.aparat.com",
+            "referer": "https://www.aparat.com/",
+            "user-agent": "Mozilla/5.0"
+          },
+          redirect: "follow"
+        });
+        if (!response.ok) continue;
+        const body = await response.json().catch(() => null);
+        attributes = body?.data?.attributes || body?.data ||
+          body?.attributes || body?.video?.attributes || body?.video || null;
+        if (attributes && typeof attributes === "object") break;
+      } catch {}
     }
 
-    const body = await response.json();
-
-    const attributes =
-      body?.data?.attributes ||
-      body?.data ||
-      body?.attributes;
+    const embedUrl =
+      "https://www.aparat.com/video/video/embed/videohash/" +
+      encodeURIComponent(id) + "/vt/frame";
 
     if (!attributes || typeof attributes !== "object") {
       return json({
-        error: "ساختار پاسخ آپارات قابل‌شناسایی نیست."
-      }, 502);
+        title: "ویدیوی آپارات",
+        uploader: "",
+        thumbnail: "",
+        downloads: [],
+        embedUrl,
+        warning: "API دریافت کیفیت‌ها پاسخ نداد؛ پخش‌کنندهٔ رسمی آپارات امتحان می‌شود."
+      });
     }
 
     const downloads = extractDownloads(attributes);
-
-    if (!downloads.length) {
-      return json({
-        error: "لینک دانلود مستقیم پیدا نشد یا API آپارات تغییر کرده است."
-      }, 404);
-    }
-
     let thumbnail = "";
-
-    const poster =
-      attributes.big_poster ||
-      attributes.small_poster ||
-      attributes.poster ||
-      "";
-
+    const poster = attributes.big_poster || attributes.small_poster ||
+      attributes.poster || attributes.thumbnail || "";
     try {
       const imageUrl = new URL(poster);
-
-      if (
-        imageUrl.protocol === "https:" &&
-        isAllowedHost(imageUrl.hostname)
-      ) {
+      if (imageUrl.protocol === "https:" && isAllowedHost(imageUrl.hostname)) {
         thumbnail = imageUrl.href;
       }
     } catch {}
 
     return json({
-      title: String(attributes.title || "ویدیوی آپارات").slice(0, 300),
-      uploader: String(
-        attributes.username || attributes.sender_name || ""
-      ).slice(0, 150),
+      title: String(attributes.title || attributes.name || "ویدیوی آپارات").slice(0, 300),
+      uploader: String(attributes.username || attributes.sender_name || "").slice(0, 150),
       thumbnail,
-      downloads
+      downloads,
+      embedUrl,
+      warning: downloads.length ? "" : "پخش آنلاین ممکن است فعال باشد، اما لینک دانلود مستقیم در دسترس نیست."
     });
-
   } catch {
     return json({
-      error: "ارتباط با API آپارات ناموفق بود."
-    }, 502);
+      title: "ویدیوی آپارات",
+      uploader: "",
+      thumbnail: "",
+      downloads: [],
+      embedUrl: "https://www.aparat.com/video/video/embed/videohash/" +
+        encodeURIComponent(id) + "/vt/frame",
+      warning: "ارتباط با API آپارات ناموفق بود؛ پخش‌کنندهٔ رسمی امتحان می‌شود."
+    });
   }
 }
