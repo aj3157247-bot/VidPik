@@ -296,6 +296,16 @@ async function adminApi(request, env, url) {
     await db.batch(stmts);
     return json({ok:true});
   }
+  if (url.pathname === "/api/admin/searches" && request.method === "GET") {
+    const limit = 100;
+    const offset = Math.max(0, Math.min(10000000, Number.parseInt(url.searchParams.get("offset") || "0", 10) || 0));
+    const term = String(url.searchParams.get("q") || "").trim().slice(0, 180);
+    const where = "event_type='search' AND TRIM(query_text)<>''" + (term ? " AND query_text LIKE ?" : "");
+    const args = term ? ["%" + term.replace(/[\\%_]/g, "\\$&") + "%"] : [];
+    const totalRow = await db.prepare("SELECT COUNT(*) total FROM analytics_events WHERE " + where).bind(...args).first();
+    const rows = await db.prepare("SELECT id,query_text query,country,device,created_at,referrer_host FROM analytics_events WHERE " + where + " ORDER BY id DESC LIMIT ? OFFSET ?").bind(...args, limit, offset).all();
+    return json({searches:rows.results||[],total:totalRow?.total||0,offset,limit,hasMore:offset+limit<(totalRow?.total||0)});
+  }
   if (url.pathname === "/api/admin/events" && request.method === "GET") {
     const rows=await db.prepare("SELECT event_type,page,query_text,referrer_host,country,device,created_at FROM analytics_events ORDER BY id DESC LIMIT 100").all();
     return json({events:rows.results||[]});
@@ -376,7 +386,7 @@ export default {
       const q = (url.searchParams.get("q") || "").trim().slice(0, 180);
       const page = Math.max(1, Math.min(20, Number.parseInt(url.searchParams.get("page") || "1", 10) || 1));
       if (!q) return json({ error: "عبارت جست‌وجو را وارد کن." }, 400);
-      await recordEvent(env,"search",request,{query:q});
+      if (page === 1) await recordEvent(env,"search",request,{query:q});
       const hostOf = value => { try { return new URL(value).hostname.replace(/^www\./i, ""); } catch { return "وب"; } };
       // Only return real Aparat video pages. General Google results are not playable videos.
       const normalize = (list) => (Array.isArray(list) ? list : []).map(item => {

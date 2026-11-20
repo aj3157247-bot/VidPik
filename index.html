@@ -270,7 +270,7 @@ checkCancel();updateProgress(true);
 const blob=new Blob(parts,{type:mime});if(!blob.size)throw new Error('فایل ویدیو خالی دریافت شد.');
 if(rangeReady)await resumeParts('clear',resumeKey(item));
 const record={id:Date.now().toString(36)+Math.random().toString(36).slice(2,8),title:item.title||'ویدیوی آپارات',uploader:item.uploader||'',source:item.source||'',quality:item.quality||'ویدیو',blob,size:blob.size,createdAt:Date.now(),type:blob.type||'video/mp4'};
-await offlineAction('put',record);await renderDownloads();trackDownload('download_complete',item);setStatus('دانلود کامل شد و ویدیو در حافظه داخلی VidPik ذخیره شد.');toast('ویدیو به بخش دانلودهای داخلی اضافه شد.');showTab('downloadsSection');
+await offlineAction('put',record);await renderDownloads();trackDownload('download_complete',item);setStatus('دانلود کامل شد؛ فایل در دانلودهای VidPik ذخیره شد و اکنون به حافظه گوشی فرستاده می‌شود.');showTab('downloadsSection');await exportOfflineToPhone(record.id);toast('دانلود کامل شد؛ فایل در VidPik و پوشه Downloads گوشی ذخیره شد.');
 }catch(error){
 if(error.name==='AbortError'||task.cancelled){trackDownload('download_cancelled',item);setStatus('دانلود لغو شد.');toast('دانلود لغو شد.')}
 else{trackDownload('download_failed',item);setStatus(error.message||'دانلود و ذخیره‌سازی ناموفق بود.',true);toast(error.message||'دانلود ناموفق بود.')}
