@@ -137,6 +137,7 @@ function formatBytes(bytes){if(!bytes)return 'حجم نامشخص';const units=[
 async function playOffline(id){try{const item=await offlineAction('get',id);if(!item||!item.blob)throw new Error('فایل ذخیره‌شده پیدا نشد.');showTab('linkSection');aparatFrame.hidden=true;aparatFrame.removeAttribute('src');player.pause();if(player.dataset.offlineUrl)URL.revokeObjectURL(player.dataset.offlineUrl);const objectUrl=URL.createObjectURL(item.blob);player.dataset.offlineUrl=objectUrl;player.src=objectUrl;player.hidden=false;player.load();titleBox.textContent=item.title||'ویدیوی آفلاین';uploaderBox.textContent='پخش آفلاین از حافظه داخلی VidPik';result.style.display='block';result.scrollIntoView({behavior:'smooth',block:'start'})}catch(error){toast(error.message||'پخش آفلاین ناموفق بود.')}}
 $('clearDownloads').addEventListener('click',async()=>{if(confirm('تمام ویدیوهای ذخیره‌شده از حافظه داخلی حذف شوند؟')){await offlineAction('clear');renderDownloads();toast('تمام ویدیوهای ذخیره‌شده حذف شدند.')}});
 const activeDownloads=new Set(),downloadQueue=[];const taskByButton=new WeakMap();const MAX_SIMULTANEOUS_DOWNLOADS=2;
+window.addEventListener('pagehide',()=>{for(const task of activeDownloads){task.controllers.forEach(controller=>{try{controller.abort()}catch{}})}});
 function pumpDownloadQueue(){while(activeDownloads.size<MAX_SIMULTANEOUS_DOWNLOADS&&downloadQueue.length){const job=downloadQueue.shift();if(job.task.cancelled){job.reject(new DOMException('Download cancelled','AbortError'));continue}activeDownloads.add(job.task);runDownloadItem(job.item,job.button,job.task).then(job.resolve,job.reject)}}
 function trackDownload(type,item){try{let sid=localStorage.getItem('vp_analytics_sid');if(!sid){sid=crypto.randomUUID?crypto.randomUUID():Date.now().toString(36);localStorage.setItem('vp_analytics_sid',sid)}fetch('/api/track',{method:'POST',headers:{'content-type':'application/json','x-vidpik-session':sid},keepalive:true,body:JSON.stringify({type,query:item?.quality||''})}).catch(()=>{})}catch{}}
 function setDownloadControls(button,mode){
@@ -152,7 +153,7 @@ controls.append(pause,cancel);
 }else controls.remove();
 }
 async function downloadItem(item,button){
-try{const saved=await resumeParts('getAll',resumeKey(item));if(saved.length){const bytes=saved.reduce((n,x)=>n+(x.blob?.size||0),0);toast('بخش‌های قبلی پیدا شد؛ دانلود از '+formatBytes(bytes)+' ادامه می‌یابد.')}}catch{}
+try{const saved=await resumeParts('getAll',resumeKey(item));if(saved.length){const bytes=saved.reduce((n,x)=>n+(x.blob?.size||0),0);toast('بخش‌های قبلی پیدا شد؛ '+formatBytes(bytes)+' حفظ شده و دانلود از ادامه آن پیش می‌رود.')}}catch{}
 const task={button,paused:false,cancelled:false,controllers:[],waiters:[],queued:true};taskByButton.set(button,task);trackDownload('download_started',item);
 return new Promise((resolve,reject)=>{downloadQueue.push({item,button,task,resolve,reject});button.disabled=true;button.textContent='در صف دانلود…';setDownloadControls(button,'active');pumpDownloadQueue();});
 }
@@ -230,14 +231,27 @@ while(true){
 await waitIfPaused();checkCancel();
 const index=next++;if(index>=segments.length)return;
 if(parts[index])continue;
-const segment=segments[index],controller=makeController();
-const response=await fetch(baseUrl,{headers:{'Range':'bytes='+segment.start+'-'+segment.end},signal:controller.signal,cache:'no-store'});
-if(response.status!==206)throw new Error('سرور فایل را به‌صورت چندبخشی نپذیرفت (HTTP '+response.status+').');
-const contentRange=response.headers.get('content-range')||'';
-if(!contentRange.startsWith('bytes '+segment.start+'-'+segment.end+'/'))throw new Error('پاسخ بخش‌بندی‌شده سرور معتبر نیست.');
-const chunks=await readResponseChunks(response);
-const segmentBlob=new Blob(chunks,{type:mime});
-if(segmentBlob.size!==segment.end-segment.start+1)throw new Error('یکی از بخش‌های فایل ناقص دریافت شد.');
+const segment=segments[index];
+let segmentBlob=null,lastError=null;
+for(let attempt=1;attempt<=3&&!segmentBlob;attempt++){
+ await waitIfPaused();checkCancel();
+ const controller=makeController();
+ try{
+  const response=await fetch(baseUrl,{headers:{'Range':'bytes='+segment.start+'-'+segment.end},signal:controller.signal,cache:'no-store'});
+  if(response.status!==206)throw new Error('سرور فایل را به‌صورت چندبخشی نپذیرفت (HTTP '+response.status+').');
+  const contentRange=response.headers.get('content-range')||'';
+  if(!contentRange.startsWith('bytes '+segment.start+'-'+segment.end+'/'))throw new Error('پاسخ بخش‌بندی‌شده سرور معتبر نیست.');
+  const chunks=await readResponseChunks(response);
+  const candidate=new Blob(chunks,{type:mime});
+  if(candidate.size!==segment.end-segment.start+1)throw new Error('یکی از بخش‌های فایل ناقص دریافت شد.');
+  segmentBlob=candidate;
+ }catch(error){
+  lastError=error;
+  if(task.cancelled||error?.name==='AbortError')throw error;
+  if(attempt<3){if(stats)stats.textContent='اتصال ناپایدار است؛ تلاش دوباره برای بخش '+(index+1)+' ('+attempt+'/3)…';await new Promise(resolve=>setTimeout(resolve,700*attempt))}
+ }
+}
+if(!segmentBlob)throw lastError||new Error('دریافت این بخش ناموفق بود.');
 parts[index]=segmentBlob;
 await resumeParts('put',jobId,index,segmentBlob);
 }
@@ -245,15 +259,13 @@ await resumeParts('put',jobId,index,segmentBlob);
 try{
 await Promise.all(Array.from({length:concurrency},()=>rangeWorker()));
 }catch(error){
-if(task.cancelled||error?.name==='AbortError')throw error;
-rangeFailed=error;
+// Keep completed segments in IndexedDB. A later retry skips them and fetches only missing parts.
 controllers.forEach(c=>{try{c.abort()}catch{}});
-parts=[];received=0;await resumeParts('clear',jobId);lastSpeed=0;lastSampleBytes=0;lastSampleAt=Date.now();
 task.controllers.length=0;
-if(stats)stats.textContent='دانلود چندبخشی در این منبع پایدار نبود؛ روش سازگار جایگزین می‌شود…';
-setStatus('اتصال چندبخشی پایدار نبود؛ ادامه از بخش ذخیره‌شده ممکن نیست و دانلود از ابتدا انجام می‌شود.');
+if(stats)stats.textContent='دانلود موقتاً متوقف شد؛ بخش‌های کامل ذخیره شده‌اند و با تلاش دوباره ادامه می‌یابد.';
+setStatus('اتصال قطع شد. '+formatBytes(received)+' از فایل حفظ شده؛ دوباره دانلود را بزن تا از همان‌جا ادامه یابد.',true);
+throw error;
 }
-if(rangeFailed)rangeReady=false;
 }else{
 setStatus('این منبع ادامه‌دادن دانلود پس از خروج را پشتیبانی نمی‌کند؛ دانلود تک‌اتصالی است.');
 }
