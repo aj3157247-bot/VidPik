@@ -273,7 +273,9 @@ async function adminApi(request, env, url) {
     const downloadCancelled=await count("download_cancelled");
     const downloadFailed=await count("download_failed");
     const recent = await db.prepare("SELECT event_type,page,query_text,referrer_host,country,device,created_at FROM analytics_events ORDER BY id DESC LIMIT 30").all();
-    return json({range,total:total.total||0,visitors:total.visitors||0,views:await count("page_view"),searches:await count("search"),resolves:await count("resolve"),downloads:(await one("SELECT COUNT(*) n FROM analytics_events WHERE event_type IN ('download_started','download') AND created_at>=?",since)).n||0,downloadCompleted,downloadPaused,downloadActive,downloadCancelled,downloadFailed,downloadIncomplete:downloadCancelled+downloadFailed,daily:daily.results||[],topPages:topPages.results||[],sources:sources.results||[],countries:countries.results||[],devices:devices.results||[],topSearches:topSearches.results||[],latestSearches:latestSearches.results||[],recent:recent.results||[]});
+    const adRows = await db.prepare("SELECT query_text ad_id,page placement,SUM(event_type='ad_impression') impressions,SUM(event_type='ad_click') clicks,COUNT(DISTINCT CASE WHEN event_type='ad_impression' THEN session_id END) unique_viewers,MAX(created_at) last_seen FROM analytics_events WHERE event_type IN ('ad_impression','ad_click') AND created_at>=? AND TRIM(query_text)<>'' GROUP BY query_text,page ORDER BY impressions DESC,clicks DESC").bind(since).all();
+    const adStats = (adRows.results||[]).map(x=>({...x,ctr:Number(x.impressions)>0?Math.round(Number(x.clicks)/Number(x.impressions)*10000)/100:0}));
+    return json({range,adStats,total:total.total||0,visitors:total.visitors||0,views:await count("page_view"),searches:await count("search"),resolves:await count("resolve"),downloads:(await one("SELECT COUNT(*) n FROM analytics_events WHERE event_type IN ('download_started','download') AND created_at>=?",since)).n||0,downloadCompleted,downloadPaused,downloadActive,downloadCancelled,downloadFailed,downloadIncomplete:downloadCancelled+downloadFailed,daily:daily.results||[],topPages:topPages.results||[],sources:sources.results||[],countries:countries.results||[],devices:devices.results||[],topSearches:topSearches.results||[],latestSearches:latestSearches.results||[],recent:recent.results||[]});
   }
   if (url.pathname === "/api/admin/ads" && request.method === "GET") {
     const rows = await db.prepare("SELECT setting_key,setting_value FROM site_settings WHERE setting_key LIKE 'ad_%'").all();
@@ -373,8 +375,8 @@ export default {
     if (url.pathname === "/api/track" && request.method === "POST") {
       let body={}; try { body=await request.json(); } catch {}
       const type=String(body.type||"").slice(0,40);
-      if (!["page_view","search","resolve","download","download_started","download_complete","download_failed","download_cancelled","download_paused","download_resumed","ad_click"].includes(type)) return json({error:"رویداد نامعتبر است."},400);
-      await recordEvent(env,type,request,{query:body.query||"",page:body.page||"/"});
+      if (!["page_view","search","resolve","download","download_started","download_complete","download_failed","download_cancelled","download_paused","download_resumed","ad_click","ad_impression"].includes(type)) return json({error:"رویداد نامعتبر است."},400);
+      await recordEvent(env,type,request,{query:body.query||body.adId||"",page:body.page||"/"});
       return json({ok:true});
     }
     if (url.pathname === "/api/health") {
