@@ -221,7 +221,10 @@ const jobId=resumeKey(item),savedParts=await resumeParts('getAll',jobId);
 savedParts.forEach(saved=>{if(segments[saved.index]&&saved.blob instanceof Blob&&saved.blob.size===segments[saved.index].end-segments[saved.index].start+1){parts[saved.index]=saved.blob;received+=saved.blob.size}});
 if(received&&stats)stats.textContent='ادامه از '+formatBytes(received)+' بخش ذخیره‌شده…';
 let next=0,rangeFailed=null;
-const concurrency=Math.min(2,segments.length);
+// Conservative parallel tuning: 4 connections for normal files, 6 only for very large files.
+ // The existing error handler below aborts parallel workers and falls back to the compatible sequential downloader.
+const targetConcurrency=total>=512*1024*1024?6:4;
+const concurrency=Math.min(targetConcurrency,segments.length);
 async function rangeWorker(){
 while(true){
 await waitIfPaused();checkCancel();
