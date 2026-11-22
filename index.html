@@ -98,7 +98,7 @@ body{background:radial-gradient(ellipse at 85% 0%,#eeeaff 0,transparent 32%),lin
     <button class="tool-card" type="button" id="homeInstall"><span class="tool-icon">＋</span><strong>نصب اپلیکیشن</strong><small>VidPik را به صفحه اصلی موبایل اضافه کن.</small></button>
   </div>
   <div class="feature-strip"><div class="feature-chip"><b>۱</b><span>جست‌وجوی آسان</span></div><div class="feature-chip"><b>۲</b><span>تماشای آنلاین</span></div><div class="feature-chip"><b>۳</b><span>دریافت ویدیو</span></div></div>
-  <div class="home-note"><span class="note-icon">ⓘ</span><div><strong>یک نکته درباره دانلود</strong><p>امکان دریافت به منبع ویدیو و مجاز بودن دانلود آن بستگی دارد. فقط محتوایی را دانلود کن که اجازه‌اش را داری.</p></div></div>
+  <div class="home-note"><span class="note-icon">✨</span><div><strong>فیلم بعدی‌ات همین‌جاست!</strong><p>عنوان فیلم یا سریال مورد علاقه‌ات را جستجو کن، ویدئوهای مرتبط آپارات را پیدا کن و از تماشای آنلاین و دریافت آسان لذت ببر.</p></div></div>
 </section>
 <section class="section" id="linkSection"><div class="panel"><div class="panel-head"><div class="panel-icon">↗</div><div><h2>تماشا و دانلود با لینک</h2><p>لینک مستقیم صفحهٔ ویدیو را وارد کن.</p></div></div><form id="videoForm"><label class="field-label" for="videoUrl">لینک ویدیوی آپارات</label><div class="input-row"><input class="text-input" id="videoUrl" type="url" required maxlength="2048" placeholder="https://www.aparat.com/v/..." autocomplete="url"><button class="primary-btn" id="submitBtn" type="submit">نمایش ویدیو</button></div></form><div id="status" class="status" role="status" aria-live="polite"></div><section class="video-result" id="result"><button class="back-search" id="backToSearch" type="button">← بازگشت به نتایج جست‌وجو</button><div id="videoTitle" class="video-title"></div><div id="uploader" class="video-meta"></div><iframe id="aparatFrame" class="aparat-frame" title="پخش آنلاین ویدیوی آپارات" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen loading="lazy" hidden></iframe><video id="videoPlayer" class="player" controls playsinline preload="metadata" hidden>مرورگر از پخش این ویدیو پشتیبانی نمی‌کند.</video><div class="ad-slot" id="adDuring" aria-label="تبلیغ هنگام تماشای ویدیو"></div><div class="ad-slot" id="adBefore" aria-label="تبلیغ پیش از دانلود"></div><div class="quality-title">کیفیت‌های قابل‌دریافت</div><div id="qualities" class="quality-grid"></div><div class="pill">پخش و دانلود به دسترسی فایل ویدیو وابسته است.</div></section></div><div class="app-info" id="installInfo"><h3>📲 نصب سریع VidPik</h3><p>می‌توانی VidPik را به صفحهٔ اصلی موبایلت اضافه کنی تا مانند اپلیکیشن باز شود.</p><div class="app-actions"><button class="primary-btn" id="installNow" type="button">نصب اپلیکیشن</button><button class="secondary-btn" id="showInstallHelp" type="button">راهنمای نصب</button></div><div class="install-help" id="installHelp">اندروید: سایت را در Chrome باز کن، منوی سه‌نقطه را بزن و «Install app» یا «افزودن به صفحهٔ اصلی» را انتخاب کن. آیفون: سایت را در Safari باز کن، Share و سپس Add to Home Screen را بزن. نصب فقط وقتی ممکن است که سایت از HTTPS باز شود.</div></div></section>
 <section class="section" id="searchSection">
@@ -112,8 +112,8 @@ body{background:radial-gradient(ellipse at 85% 0%,#eeeaff 0,transparent 32%),lin
 <button id="loadMoreResults" class="secondary-btn" type="button" style="display:none;width:100%;margin-top:14px">نتایج بیشتر</button>
 </div>
 </section>
-<section class="section" id="downloadsSection"><div class="panel"><div class="panel-head"><div class="panel-icon">⇩</div><div><h2>دانلودهای من</h2><p>سوابق دانلود این دستگاه را ببین، دوباره دریافت کن یا از فهرست حذف کن.</p></div></div><div class="app-info" style="margin:0 0 13px"><h3>⚡ دانلود هم‌زمان هوشمند</h3><p>تا ۲ فیلم هم‌زمان دانلود می‌شوند؛ فیلم‌های بعدی خودکار در صف قرار می‌گیرند تا سرعت و حافظه گوشی بهتر مدیریت شود.</p></div><div id="downloadsList" class="downloads-list"></div><button class="secondary-btn" id="clearDownloads" type="button" style="margin-top:13px">پاک‌کردن تمام سوابق</button><p class="status">به‌دلیل محدودیت امنیتی مرورگر، این فهرست سوابق دانلودهای انجام‌شده از VidPik است؛ سایت نمی‌تواند فایل‌های پوشهٔ Downloads گوشی را بخواند یا از حافظهٔ گوشی حذف کند.</p></div></section>
-<div class="footer">VidPik ابزار مستقلی است. فقط ویدیوهایی را دریافت کن که اجازهٔ تماشا و دانلودشان را داری.</div></main>
+<section class="section" id="downloadsSection"><div class="panel"><div class="panel-head"><div class="panel-icon">⇩</div><div><h2>دانلودهای من</h2><p>سوابق دانلود این دستگاه را ببین، دوباره دریافت کن یا از فهرست حذف کن.</p></div></div><div class="app-info" style="margin:0 0 13px"><h3>⚡ دانلود هم‌زمان هوشمند</h3><p>تا ۲ فیلم هم‌زمان دانلود می‌شوند؛ فیلم‌های بعدی خودکار در صف قرار می‌گیرند تا سرعت و حافظه گوشی بهتر مدیریت شود.</p></div><div id="downloadsList" class="downloads-list"></div><button class="secondary-btn" id="clearDownloads" type="button" style="margin-top:13px">پاک‌کردن تمام سوابق</button><p class="status">ویدئوهای دریافت‌شده را اینجا مدیریت کن؛ دانلودهای اندروید نیز در برنامهٔ Downloads گوشی قابل پیگیری‌اند.</p></div></section>
+<div class="footer">🎬 VidPik؛ جستجو کن، تماشا کن، دنیای ویدئو را کشف کن! 💜</div></main>
 <nav class="bottom-nav" aria-label="بخش‌های اصلی"><button class="nav-button active" data-tab="homeSection" type="button"><span class="nav-icon">⌂</span><span>خانه</span></button><button class="nav-button" data-tab="searchSection" type="button"><span class="nav-icon">⌕</span><span>جست‌وجو</span></button><button class="nav-button" data-tab="linkSection" type="button"><span class="nav-icon">▶</span><span>لینک ویدیو</span></button><button class="nav-button" data-tab="downloadsSection" type="button"><span class="nav-icon">⇩</span><span>دانلودها</span></button></nav><div id="toast" class="toast" role="status" aria-live="polite"></div>
 <script>
 const $=id=>document.getElementById(id);const form=$('videoForm'),urlInput=$('videoUrl'),submitBtn=$('submitBtn'),statusBox=$('status'),result=$('result'),titleBox=$('videoTitle'),uploaderBox=$('uploader'),player=$('videoPlayer'),aparatFrame=$('aparatFrame'),qualities=$('qualities');let lastVideo=null,installPrompt=null;
@@ -153,7 +153,20 @@ controls.append(pause,cancel);
 }else controls.remove();
 }
 async function downloadItem(item,button){
-try{const saved=await resumeParts('getAll',resumeKey(item));if(saved.length){const bytes=saved.reduce((n,x)=>n+(x.blob?.size||0),0);toast('بخش‌های قبلی پیدا شد؛ '+formatBytes(bytes)+' حفظ شده و دانلود از ادامه آن پیش می‌رود.')}}catch{}
+ // Android Chrome/WebView should hand the stream to the system download manager.
+ // Unlike a page-owned fetch/blob, a native browser download can continue after this page closes.
+ if(/Android/i.test(navigator.userAgent)){
+  const directUrl='/api/download?url='+encodeURIComponent(item.url)+'&quality='+encodeURIComponent(item.quality||'video');
+  const anchor=document.createElement('a');anchor.href=directUrl;anchor.download='';anchor.rel='noopener';anchor.style.display='none';
+  document.body.append(anchor);anchor.click();anchor.remove();
+  trackDownload('download_started',item);
+  if(button){button.disabled=true;button.textContent='ارسال به دانلودهای گوشی…';}
+  setStatus('دانلود به دانلود منیجر گوشی سپرده شد؛ می‌توانی از VidPik خارج شوی و دانلود را در اعلان‌های گوشی دنبال کنی.');
+  toast('درخواست دانلود به گوشی فرستاده شد.');
+  if(button){setTimeout(()=>{button.disabled=false;button.textContent='دانلود دوباره';},1800);}
+  return;
+ }
+ try{const saved=await resumeParts('getAll',resumeKey(item));if(saved.length){const bytes=saved.reduce((n,x)=>n+(x.blob?.size||0),0);toast('بخش‌های قبلی پیدا شد؛ '+formatBytes(bytes)+' حفظ شده و دانلود از ادامه آن پیش می‌رود.')}}catch{}
 const task={button,paused:false,cancelled:false,controllers:[],waiters:[],queued:true};taskByButton.set(button,task);trackDownload('download_started',item);
 return new Promise((resolve,reject)=>{downloadQueue.push({item,button,task,resolve,reject});button.disabled=true;button.textContent='در صف دانلود…';setDownloadControls(button,'active');pumpDownloadQueue();});
 }
@@ -224,7 +237,7 @@ if(received&&stats)stats.textContent='ادامه از '+formatBytes(received)+' 
 let next=0,rangeFailed=null;
 // Conservative parallel tuning: 4 connections for normal files, 6 only for very large files.
  // The existing error handler below aborts parallel workers and falls back to the compatible sequential downloader.
-const targetConcurrency=total>=512*1024*1024?6:4;
+const targetConcurrency=total>=512*1024*1024?8:6;
 const concurrency=Math.min(targetConcurrency,segments.length);
 async function rangeWorker(){
 while(true){

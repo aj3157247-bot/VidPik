@@ -435,34 +435,87 @@ export default {
         });
         const aparatBody = await aparatResponse.json().catch(() => null);
         if (aparatResponse.ok && aparatBody && !aparatBody.error) {
-          const block = aparatBody.data?.[0] || {};
-          const mixed = block.mixV2?.data || [];
+          // Collect every video object in the response; Aparat changes the mix nesting periodically.
           const seen = new Set();
-          const items = mixed.filter(x => x?.type === "Video" && x?.data?.uid)
-            .map(x => {
-              const v = x.data;
-              const uid = String(v.uid);
-              if (!/^[a-zA-Z0-9_-]{3,40}$/.test(uid) || seen.has(uid)) return null;
-              seen.add(uid);
-              const candidates = [
-                v.small_poster, v.medium_poster, v.big_poster, v.poster,
-                v.thumbnail, v.image, v.pic
-              ];
-              let thumbnail = candidates.find(x => typeof x === "string" && /^https:\/\//i.test(x)) || "";
-              return {
-                title: String(v.title || "ویدیوی آپارات").slice(0, 300),
-                url: "https://www.aparat.com/v/" + uid,
-                thumbnail,
-                snippet: String(v.description || v.meta_description || "").slice(0, 500),
-                uploader: String(v.sender_name || v.username || "آپارات").slice(0, 100),
-                source: "جستجوی مستقیم آپارات",
-                isAparat: true
-              };
-            }).filter(Boolean);
-          const nextUrl = String(block.link?.next || "");
+          const videoNodes = [];
+          const visited = new WeakSet();
+          const walk = (node, depth = 0) => {
+            if (!node || typeof node !== "object" || depth > 12 || visited.has(node)) return;
+            visited.add(node);
+            if (Array.isArray(node)) { for (const child of node) walk(child, depth + 1); return; }
+            const type = String(node.type || node.kind || "").toLowerCase();
+            const candidate = node.data && typeof node.data === "object" ? node.data : node;
+            const uid = String(candidate.uid || candidate.video_hash || candidate.videohash || "");
+            if ((type === "video" || (uid && (candidate.title || candidate.sender_name))) &&
+                /^[a-zA-Z0-9_-]{3,40}$/.test(uid)) videoNodes.push(candidate);
+            for (const [key, value] of Object.entries(node)) {
+              if (key !== "link" && key !== "links") walk(value, depth + 1);
+            }
+          };
+          walk(aparatBody);
+          const items = videoNodes.map(v => {
+            const uid = String(v.uid || v.video_hash || v.videohash);
+            if (seen.has(uid)) return null;
+            seen.add(uid);
+            const candidates = [v.small_poster, v.medium_poster, v.big_poster, v.poster, v.thumbnail, v.image, v.pic];
+            const thumbnail = candidates.find(x => typeof x === "string" && /^https:\/\//i.test(x)) || "";
+            return {
+              title: String(v.title || v.name || "ویدیوی آپارات").slice(0, 300),
+              url: "https://www.aparat.com/v/" + uid,
+              thumbnail,
+              snippet: String(v.description || v.meta_description || "").slice(0, 500),
+              uploader: String(v.sender_name || v.username || v.owner?.name || "آپارات").slice(0, 100),
+              source: "جستجوی مستقیم آپارات",
+              isAparat: true
+            };
+          }).filter(Boolean);
           let next = "";
-          try { next = new URL(nextUrl, "https://www.aparat.com").searchParams.get("nextq") || ""; } catch {}
-          return json({ items, page, hasMore: Boolean(next), next, provider: "جستجوی مستقیم آپارات" });
+          const findNext = (node, depth = 0) => {
+            if (!node || typeof node !== "object" || depth > 10 || next) return;
+            if (Array.isArray(node)) { for (const child of node) findNext(child, depth + 1); return; }
+            const raw = node.link?.next || node.links?.next || node.next;
+            if (typeof raw === "string" && raw) {
+              try { next = new URL(raw, "https://www.aparat.com").searchParams.get("nextq") || ""; } catch {}
+            }
+            for (const value of Object.values(node)) findNext(value, depth + 1);
+          };
+          findNext(aparatBody);
+          // Merge indexed Aparat video pages as a second discovery source when configured.
+          // This helps surface uploads that the current Aparat mixed-search response omits.
+          let secondaryHasMore = false;
+          try {
+            let secondary = [];
+            if (env.SERPAPI_KEY) {
+              const endpoint = new URL("https://serpapi.com/search.json");
+              endpoint.searchParams.set("engine", "google");
+              endpoint.searchParams.set("q", "site:aparat.com/v " + q);
+              endpoint.searchParams.set("num", "10");
+              endpoint.searchParams.set("start", String((page - 1) * 10));
+              endpoint.searchParams.set("api_key", env.SERPAPI_KEY);
+              const response = await fetch(endpoint.toString(), { headers: { "accept": "application/json" } });
+              const body = await response.json().catch(() => null);
+              if (response.ok && Array.isArray(body?.organic_results)) {
+                secondary = normalize(body.organic_results);
+                secondaryHasMore = Boolean(body.serpapi_pagination?.next);
+              }
+            } else if (env.GOOGLE_API_KEY && env.GOOGLE_CSE_ID) {
+              const endpoint = new URL("https://www.googleapis.com/customsearch/v1");
+              endpoint.searchParams.set("key", env.GOOGLE_API_KEY);
+              endpoint.searchParams.set("cx", env.GOOGLE_CSE_ID);
+              endpoint.searchParams.set("q", "site:aparat.com/v " + q);
+              endpoint.searchParams.set("num", "10");
+              endpoint.searchParams.set("start", String((page - 1) * 10 + 1));
+              const response = await fetch(endpoint.toString(), { headers: { "accept": "application/json" } });
+              const body = await response.json().catch(() => null);
+              if (response.ok && Array.isArray(body?.items)) {
+                secondary = normalize(body.items);
+                secondaryHasMore = Boolean(body.queries?.nextPage?.length);
+              }
+            }
+            const known = new Set(items.map(item => item.url));
+            for (const item of secondary) if (!known.has(item.url)) { known.add(item.url); items.push(item); }
+          } catch (_) { /* primary Aparat results remain usable if indexing provider is unavailable */ }
+          return json({ items, page, hasMore: Boolean(next) || secondaryHasMore, next, provider: "آپارات + جستجوی تکمیلی" });
         }
         // If Aparat's unofficial endpoint is temporarily unavailable, keep the existing search providers.
         if (env.SERPAPI_KEY) {
@@ -538,12 +591,14 @@ export default {
         if (contentType.includes("text/html") || contentType.includes("application/json")) {
           return json({ error: "سایت منبع به‌جای فایل ویدیو، صفحهٔ وب برگرداند. این ویدیو لینک دانلود مستقیم قابل‌دسترسی ندارد." }, 502);
         }
-        const disposition = 'attachment; filename="vidpik-video.mp4"';
+        const extension = /webm/i.test(contentType) ? "webm" : /quicktime/i.test(contentType) ? "mov" : "mp4";
+        const disposition = `attachment; filename="VidPik-video.${extension}"`;
         const headers = new Headers({
           "content-type": contentType || "application/octet-stream",
           "content-disposition": disposition,
-          "cache-control": "no-store",
-          "x-content-type-options": "nosniff"
+          "cache-control": "no-store, no-transform",
+          "x-content-type-options": "nosniff",
+          "accept-ranges": upstream.headers.get("accept-ranges") || "bytes"
         });
         for (const name of ["content-length", "accept-ranges", "content-range"]) {
           const value = upstream.headers.get(name);
