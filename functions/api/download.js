@@ -62,14 +62,14 @@ export async function onRequestGet({ request }) {
       }, 502);
     }
 
+    const mediaType = upstream.headers.get("Content-Type") || "application/octet-stream";
+    const extension = /webm/i.test(mediaType) ? "webm" : /quicktime/i.test(mediaType) ? "mov" : "mp4";
     const responseHeaders = new Headers({
-      "Content-Type":
-        upstream.headers.get("Content-Type") ||
-        "application/octet-stream",
-      "Content-Disposition":
-        `attachment; filename="VidPik-${quality || "video"}.mp4"`,
-      "Cache-Control": "no-store",
-      "X-Content-Type-Options": "nosniff"
+      "Content-Type": mediaType,
+      "Content-Disposition": `attachment; filename="VidPik-${quality || "video"}.${extension}"`,
+      "Cache-Control": "no-store, no-transform",
+      "X-Content-Type-Options": "nosniff",
+      "Accept-Ranges": upstream.headers.get("Accept-Ranges") || "bytes"
     });
 
     for (const key of [
