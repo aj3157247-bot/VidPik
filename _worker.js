@@ -5,7 +5,7 @@
  */
 const API_BASE = "https://www.aparat.com/api/fa/v1/video/video/show/videohash/";
 const ALLOWED_PAGE_HOSTS = new Set(["aparat.com", "www.aparat.com", "m.aparat.com"]);
-const ALLOWED_MEDIA_HOST_RE = /\.aparat\.(com|ir)$/i;
+const ALLOWED_MEDIA_HOST_RE = /(^|\.)(asset|cdn)\.aparat\.(com|ir)$/i;
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
@@ -32,17 +32,8 @@ function getVideoId(raw) {
 function safeMediaUrl(raw) {
   try {
     const u = new URL(raw);
-    const host = u.hostname.toLowerCase();
-    return u.protocol === "https:" && ALLOWED_MEDIA_HOST_RE.test(host) && host !== "www.aparat.com" && host !== "m.aparat.com";
+    return u.protocol === "https:" && ALLOWED_MEDIA_HOST_RE.test(u.hostname.toLowerCase());
   } catch { return false; }
-}
-function normalizePlaybackSources(attrs, downloads) {
-  const sources = [...downloads];
-  const hls = attrs && (attrs.hls_link || attrs.hls_url || attrs.hls);
-  if (typeof hls === "string" && safeMediaUrl(hls) && !sources.some(x => x.url === hls)) {
-    sources.push({ quality: "پخش آنلاین", url: hls, type: "application/vnd.apple.mpegurl" });
-  }
-  return sources;
 }
 function normalizeDownloads(attrs) {
   const candidates = [];
@@ -109,6 +100,9 @@ async function resolveAparat(raw) {
     } catch (_) {}
   }
 
+  // The embedded Aparat player can still work when its metadata/download API is unavailable.
+  const embedUrl = "https://www.aparat.com/video/video/embed/videohash/" +
+    encodeURIComponent(id) + "/vt/frame";
   if (!attrs) {
     return {
       title: "ویدیوی آپارات",
@@ -117,14 +111,14 @@ async function resolveAparat(raw) {
       downloads: [],
       mediaSources: [],
       downloadAllowed: false,
+      embedUrl,
       warning: lastStatus === 404
-        ? "اطلاعات این ویدیو از API آپارات دریافت نشد."
-        : "API دریافت اطلاعات و کیفیت‌ها پاسخ نداد."
+        ? "اطلاعات دانلود از API آپارات دریافت نشد؛ پخش‌کنندهٔ رسمی امتحان می‌شود."
+        : "API دریافت کیفیت‌ها پاسخ نداد؛ پخش‌کنندهٔ رسمی امتحان می‌شود."
     };
   }
 
   const downloads = normalizeDownloads(attrs);
-  const mediaSources = normalizePlaybackSources(attrs, downloads);
   const title = String(attrs.title || attrs.name || "ویدیوی آپارات").slice(0, 300);
   const uploader = attrs.username || attrs.sender_name || attrs.owner?.name || attrs.uploader?.name || "";
   const thumbnail = attrs.big_poster || attrs.small_poster || attrs.poster || attrs.thumbnail || "";
@@ -138,9 +132,10 @@ async function resolveAparat(raw) {
     uploader: String(uploader).slice(0, 150),
     thumbnail: safeThumbnail,
     downloads,
-    mediaSources,
+    mediaSources: downloads,
     downloadAllowed: downloads.length > 0,
-    warning: downloads.length ? "" : "برای این ویدیو لینک مستقیم قابل‌دسترسی از API دریافت نشد."
+    embedUrl,
+    warning: downloads.length ? "" : "پخش‌کنندهٔ رسمی در دسترس است، اما لینک دانلود مستقیم از API دریافت نشد."
   };
 }
 
@@ -474,7 +469,7 @@ export default {
             if (Array.isArray(node)) { for (const child of node) walk(child, depth + 1); return; }
             const type = String(node.type || node.kind || "").toLowerCase();
             const candidate = node.data && typeof node.data === "object" ? node.data : node;
-            const uid = String(candidate.uid || candidate.video_hash || candidate.videohash || "");
+            const uid = String(candidate.uid || candidate.video_hash || candidate.videohash || candidate.hash_id || "");
             if ((type === "video" || (uid && (candidate.title || candidate.sender_name))) &&
                 /^[a-zA-Z0-9_-]{3,40}$/.test(uid)) videoNodes.push(candidate);
             for (const [key, value] of Object.entries(node)) {
@@ -483,17 +478,17 @@ export default {
           };
           walk(aparatBody);
           const items = videoNodes.map(v => {
-            const uid = String(v.uid || v.video_hash || v.videohash);
+            const uid = String(v.uid || v.video_hash || v.videohash || v.hash_id);
             if (seen.has(uid)) return null;
             seen.add(uid);
-            const candidates = [v.small_poster, v.medium_poster, v.big_poster, v.poster, v.thumbnail, v.image, v.pic];
+            const candidates = [v.small_poster, v.medium_poster, v.big_poster, v.poster, v.thumbnail, v.image, v.pic, v.uploader?.icon];
             const thumbnail = candidates.find(x => typeof x === "string" && /^https:\/\//i.test(x)) || "";
             return {
               title: String(v.title || v.name || "ویدیوی آپارات").slice(0, 300),
               url: "https://www.aparat.com/v/" + uid,
               thumbnail,
               snippet: String(v.description || v.meta_description || "").slice(0, 500),
-              uploader: String(v.sender_name || v.username || v.owner?.name || "آپارات").slice(0, 100),
+              uploader: String(v.sender_name || v.username || v.owner?.name || v.uploader?.name || "آپارات").slice(0, 100),
               source: "جستجوی مستقیم آپارات",
               isAparat: true
             };
@@ -544,14 +539,9 @@ export default {
             const known = new Set(items.map(item => item.url));
             for (const item of secondary) if (!known.has(item.url)) { known.add(item.url); items.push(item); }
           } catch (_) { /* primary Aparat results remain usable if indexing provider is unavailable */ }
-          // A successful HTTP response can still contain an unfamiliar/empty result shape.
-          // Do not return an empty success here: continue to the configured search providers below.
-          if (items.length) {
-            return json({ items, page, hasMore: Boolean(next) || secondaryHasMore, next, provider: "آپارات + جستجوی تکمیلی" });
-          }
+          return json({ items, page, hasMore: Boolean(next) || secondaryHasMore, next, provider: "آپارات + جستجوی تکمیلی" });
         }
-        // If Aparat's unofficial endpoint is temporarily unavailable or its response shape
-        // yielded no playable video records, continue with the configured search providers.
+        // If Aparat's unofficial endpoint is temporarily unavailable, keep the existing search providers.
         if (env.SERPAPI_KEY) {
           const endpoint = new URL("https://serpapi.com/search.json");
           endpoint.searchParams.set("engine", "google");
