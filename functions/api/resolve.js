@@ -71,55 +71,27 @@ function getVideoId(value) {
 
 function extractDownloads(attributes) {
   const downloads = [];
-
-  const all = attributes?.file_link_all;
-
-  if (Array.isArray(all)) {
-    for (const item of all) {
-      const quality = String(
-        item?.profile || item?.quality || item?.label || "کیفیت موجود"
-      );
-
-      const urls = Array.isArray(item?.urls) ? item.urls : [];
-
-      for (const url of urls) {
-        if (typeof url === "string" && validMediaUrl(url)) {
-          downloads.push({ quality, url });
-        }
-      }
-    }
+  const seen = new Set();
+  const add = (url, quality, type) => {
+    if (typeof url !== "string" || !validMediaUrl(url) || seen.has(url)) return;
+    seen.add(url);
+    downloads.push({ quality: String(quality || "کیفیت موجود").slice(0, 80), url, type: String(type || "").slice(0, 100) });
+  };
+  const walk = (value, fallback = "کیفیت موجود", depth = 0) => {
+    if (depth > 6 || value == null) return;
+    if (typeof value === "string") { add(value, fallback); return; }
+    if (Array.isArray(value)) { for (const item of value) walk(item, fallback, depth + 1); return; }
+    if (typeof value !== "object") return;
+    const quality = value.profile || value.quality || value.label || value.resolution || value.height || value.name || fallback;
+    const type = value.type || value.mime_type || value.mimeType || "";
+    for (const key of ["url", "src", "file", "link", "file_link", "download_url"]) if (typeof value[key] === "string") add(value[key], quality, type);
+    for (const key of ["urls", "files", "sources", "streams", "items", "links", "qualities"]) if (value[key] != null) walk(value[key], quality, depth + 1);
+  };
+  for (const key of ["file_link_all", "file_link", "download_link", "download_links", "multiSRC", "sources", "streams", "qualities", "files"]) {
+    if (attributes && attributes[key] != null) walk(attributes[key], attributes.profile || "کیفیت موجود");
   }
-
-  for (const key of ["file_link", "download_link"]) {
-    const url = attributes?.[key];
-
-    if (typeof url === "string" && validMediaUrl(url)) {
-      downloads.push({
-        quality: String(attributes?.profile || "کیفیت موجود"),
-        url
-      });
-    }
-  }
-  for (const key of ["download_links", "multiSRC", "sources"]) {
-    const list = attributes?.[key];
-    if (!Array.isArray(list)) continue;
-    for (const entry of list) {
-      const items = Array.isArray(entry) ? entry : [entry];
-      for (const item of items) {
-        const url = typeof item === "string" ? item : (item?.url || item?.src);
-        if (typeof url === "string" && validMediaUrl(url)) {
-          downloads.push({
-            quality: String(item?.quality || item?.profile || item?.label || "کیفیت موجود"),
-            url
-          });
-        }
-      }
-    }
-  }
-
-  return [...new Map(
-    downloads.map(item => [item.url, item])
-  ).values()].slice(0, 12);
+  downloads.sort((a, b) => Number((String(b.quality).match(/\d{3,4}/) || [0])[0]) - Number((String(a.quality).match(/\d{3,4}/) || [0])[0]));
+  return downloads.slice(0, 30);
 }
 
 export async function onRequestGet({ request }) {
@@ -289,6 +261,8 @@ export async function onRequestGet({ request }) {
       uploader: String(attributes.username || attributes.sender_name || "").slice(0, 150),
       thumbnail,
       downloads,
+      mediaSources: downloads,
+      downloadAllowed: downloads.length > 0,
       embedUrl,
       warning: downloads.length ? "" : "پخش آنلاین ممکن است فعال باشد، اما لینک دانلود مستقیم در دسترس نیست."
     });

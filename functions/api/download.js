@@ -24,6 +24,7 @@ export async function onRequestGet({ request }) {
   const quality = (
     reqUrl.searchParams.get("quality") || "video"
   ).replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 20);
+  const inline = reqUrl.searchParams.get("mode") === "stream";
 
   let media;
 
@@ -66,7 +67,7 @@ export async function onRequestGet({ request }) {
     const extension = /webm/i.test(mediaType) ? "webm" : /quicktime/i.test(mediaType) ? "mov" : "mp4";
     const responseHeaders = new Headers({
       "Content-Type": mediaType,
-      "Content-Disposition": `attachment; filename="VidPik-${quality || "video"}.${extension}"`,
+      "Content-Disposition": `${inline ? "inline" : "attachment"}; filename="VidPik-${quality || "video"}.${extension}"`,
       "Cache-Control": "no-store, no-transform",
       "X-Content-Type-Options": "nosniff",
       "Accept-Ranges": upstream.headers.get("Accept-Ranges") || "bytes"
