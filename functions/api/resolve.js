@@ -25,7 +25,8 @@ function isAllowedHost(host) {
 function validMediaUrl(value) {
   try {
     const u = new URL(value);
-    return u.protocol === "https:" && isAllowedHost(u.hostname);
+    const host = u.hostname.toLowerCase();
+    return u.protocol === "https:" && isAllowedHost(host) && host !== "www.aparat.com" && host !== "m.aparat.com";
   } catch {
     return false;
   }
@@ -67,6 +68,15 @@ function getVideoId(value) {
   }
 
   return id;
+}
+
+function extractPlaybackSources(attributes, downloads) {
+  const sources = [...downloads];
+  const hls = attributes && (attributes.hls_link || attributes.hls_url || attributes.hls);
+  if (typeof hls === "string" && validMediaUrl(hls) && !sources.some(item => item.url === hls)) {
+    sources.push({ quality: "پخش آنلاین", url: hls, type: "application/vnd.apple.mpegurl" });
+  }
+  return sources;
 }
 
 function extractDownloads(attributes) {
@@ -230,22 +240,18 @@ export async function onRequestGet({ request }) {
       } catch {}
     }
 
-    const embedUrl =
-      "https://www.aparat.com/video/video/embed/videohash/" +
-      encodeURIComponent(id) + "/vt/frame";
-
     if (!attributes || typeof attributes !== "object") {
       return json({
         title: "ویدیوی آپارات",
         uploader: "",
         thumbnail: "",
         downloads: [],
-        embedUrl,
-        warning: "API دریافت کیفیت‌ها پاسخ نداد؛ پخش‌کنندهٔ رسمی آپارات امتحان می‌شود."
+        warning: "API دریافت اطلاعات و کیفیت‌ها پاسخ نداد."
       });
     }
 
     const downloads = extractDownloads(attributes);
+    const mediaSources = extractPlaybackSources(attributes, downloads);
     let thumbnail = "";
     const poster = attributes.big_poster || attributes.small_poster ||
       attributes.poster || attributes.thumbnail || "";
@@ -261,10 +267,9 @@ export async function onRequestGet({ request }) {
       uploader: String(attributes.username || attributes.sender_name || "").slice(0, 150),
       thumbnail,
       downloads,
-      mediaSources: downloads,
+      mediaSources,
       downloadAllowed: downloads.length > 0,
-      embedUrl,
-      warning: downloads.length ? "" : "پخش آنلاین ممکن است فعال باشد، اما لینک دانلود مستقیم در دسترس نیست."
+      warning: downloads.length ? "" : "برای این ویدیو لینک مستقیم قابل‌دسترسی از API دریافت نشد."
     });
   } catch {
     return json({
@@ -272,9 +277,7 @@ export async function onRequestGet({ request }) {
       uploader: "",
       thumbnail: "",
       downloads: [],
-      embedUrl: "https://www.aparat.com/video/video/embed/videohash/" +
-        encodeURIComponent(id) + "/vt/frame",
-      warning: "ارتباط با API آپارات ناموفق بود؛ پخش‌کنندهٔ رسمی امتحان می‌شود."
+      warning: "ارتباط با API آپارات ناموفق بود."
     });
   }
 }
