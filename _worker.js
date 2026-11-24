@@ -37,48 +37,39 @@ function safeMediaUrl(raw) {
 }
 function normalizeDownloads(attrs) {
   const candidates = [];
-  const all = attrs?.file_link_all;
-  if (Array.isArray(all)) {
-    for (const item of all) {
-      const quality = item?.profile || item?.quality || item?.label || "";
-      const urls = Array.isArray(item?.urls) ? item.urls : (item?.url ? [item.url] : []);
-      for (const raw of urls) {
-        if (typeof raw === "string" && safeMediaUrl(raw)) {
-          candidates.push({ quality: String(quality || "ویدیو"), url: raw });
-        }
-      }
+  const seen = new Set();
+  const add = (raw, quality, type) => {
+    if (typeof raw !== "string" || !safeMediaUrl(raw) || seen.has(raw)) return;
+    seen.add(raw);
+    candidates.push({
+      quality: String(quality || "کیفیت موجود").slice(0, 80),
+      url: raw,
+      type: String(type || "").slice(0, 100)
+    });
+  };
+  const walk = (value, fallback = "کیفیت موجود", depth = 0) => {
+    if (depth > 6 || value == null) return;
+    if (typeof value === "string") { add(value, fallback); return; }
+    if (Array.isArray(value)) { for (const item of value) walk(item, fallback, depth + 1); return; }
+    if (typeof value !== "object") return;
+    const quality = value.profile || value.quality || value.label || value.resolution || value.height || value.name || fallback;
+    const type = value.type || value.mime_type || value.mimeType || "";
+    for (const key of ["url", "src", "file", "link", "file_link", "download_url"]) {
+      if (typeof value[key] === "string") add(value[key], quality, type);
     }
-  }
-  for (const key of ["file_link", "download_link"]) {
-    const raw = attrs?.[key];
-    if (typeof raw === "string" && safeMediaUrl(raw)) {
-      candidates.push({ quality: String(attrs?.profile || "کیفیت موجود"), url: raw });
+    for (const key of ["urls", "files", "sources", "streams", "items", "links", "qualities"]) {
+      if (value[key] != null) walk(value[key], quality, depth + 1);
     }
+  };
+  for (const key of ["file_link_all", "file_link", "download_link", "download_links", "multiSRC", "sources", "streams", "qualities", "files"]) {
+    if (attrs && attrs[key] != null) walk(attrs[key], attrs.profile || "کیفیت موجود");
   }
-  // Newer Aparat responses may expose download_links or player multiSRC instead.
-  for (const key of ["download_links", "multiSRC", "sources"]) {
-    const list = attrs?.[key];
-    if (!Array.isArray(list)) continue;
-    for (const entry of list) {
-      const items = Array.isArray(entry) ? entry : [entry];
-      for (const item of items) {
-        const raw = typeof item === "string" ? item : (item?.url || item?.src);
-        if (typeof raw === "string" && safeMediaUrl(raw)) {
-          candidates.push({
-            quality: String(item?.quality || item?.profile || item?.label || "کیفیت موجود"),
-            url: raw
-          });
-        }
-      }
-    }
-  }
-  const unique = [...new Map(candidates.map(x => [x.url, x])).values()];
-  unique.sort((a, b) => {
-    const ra = Number((a.quality.match(/\d{3,4}/) || [0])[0]);
-    const rb = Number((b.quality.match(/\d{3,4}/) || [0])[0]);
-    return ra - rb;
+  candidates.sort((a, b) => {
+    const ah = Number((String(a.quality).match(/\d{3,4}/) || [0])[0]);
+    const bh = Number((String(b.quality).match(/\d{3,4}/) || [0])[0]);
+    return bh - ah;
   });
-  return unique;
+  return candidates.slice(0, 30);
 }
 async function resolveAparat(raw) {
   const id = getVideoId(raw);
@@ -118,6 +109,8 @@ async function resolveAparat(raw) {
       uploader: "",
       thumbnail: "",
       downloads: [],
+      mediaSources: [],
+      downloadAllowed: false,
       embedUrl,
       warning: lastStatus === 404
         ? "اطلاعات دانلود از API آپارات دریافت نشد؛ پخش‌کنندهٔ رسمی امتحان می‌شود."
@@ -139,6 +132,8 @@ async function resolveAparat(raw) {
     uploader: String(uploader).slice(0, 150),
     thumbnail: safeThumbnail,
     downloads,
+    mediaSources: downloads,
+    downloadAllowed: downloads.length > 0,
     embedUrl,
     warning: downloads.length ? "" : "پخش‌کنندهٔ رسمی در دسترس است، اما لینک دانلود مستقیم از API دریافت نشد."
   };
@@ -590,6 +585,40 @@ export default {
         return json(result);
       } catch (error) {
         return json({ error: error instanceof Error ? error.message : "خطای نامشخص." }, 400);
+      }
+    }
+    // Inline media proxy for the internal player; forwards byte ranges for seeking.
+    if (url.pathname === "/api/stream") {
+      if (request.method !== "GET" && request.method !== "HEAD") return json({ error: "فقط GET و HEAD پذیرفته می‌شود." }, 405);
+      const raw = url.searchParams.get("url");
+      if (!raw || raw.length > 4096 || !safeMediaUrl(raw)) return json({ error: "لینک فایل ویدیویی معتبر نیست." }, 400);
+      try {
+        const upstream = await fetch(raw, {
+          method: request.method,
+          headers: {
+            "accept": "video/*, application/vnd.apple.mpegurl, application/octet-stream;q=0.9, */*;q=0.8",
+            ...(request.headers.has("range") ? { "range": request.headers.get("range") } : {})
+          },
+          redirect: "follow"
+        });
+        if (!safeMediaUrl(upstream.url || raw)) return json({ error: "منبع پخش به دامنه تأییدنشده هدایت شد." }, 502);
+        if (!upstream.ok && upstream.status !== 206) return json({ error: "دریافت جریان ویدیو ناموفق بود (HTTP " + upstream.status + ")." }, 502);
+        const contentType = (upstream.headers.get("content-type") || "application/octet-stream").toLowerCase();
+        if (contentType.includes("text/html") || contentType.includes("application/json")) return json({ error: "منبع به‌جای ویدیو، صفحه وب برگرداند." }, 502);
+        const headers = new Headers({
+          "content-type": contentType,
+          "content-disposition": "inline",
+          "cache-control": "no-store, no-transform",
+          "x-content-type-options": "nosniff",
+          "accept-ranges": upstream.headers.get("accept-ranges") || "bytes"
+        });
+        for (const name of ["content-length", "content-range", "accept-ranges"]) {
+          const value = upstream.headers.get(name);
+          if (value) headers.set(name, value);
+        }
+        return new Response(request.method === "HEAD" ? null : upstream.body, { status: upstream.status, headers });
+      } catch {
+        return json({ error: "ارتباط با منبع پخش ویدیو ناموفق بود." }, 502);
       }
     }
     // Download only verified public Aparat media URLs; never return the app's HTML page as a download.
