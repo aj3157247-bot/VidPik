@@ -544,9 +544,14 @@ export default {
             const known = new Set(items.map(item => item.url));
             for (const item of secondary) if (!known.has(item.url)) { known.add(item.url); items.push(item); }
           } catch (_) { /* primary Aparat results remain usable if indexing provider is unavailable */ }
-          return json({ items, page, hasMore: Boolean(next) || secondaryHasMore, next, provider: "آپارات + جستجوی تکمیلی" });
+          // A successful HTTP response can still contain an unfamiliar/empty result shape.
+          // Do not return an empty success here: continue to the configured search providers below.
+          if (items.length) {
+            return json({ items, page, hasMore: Boolean(next) || secondaryHasMore, next, provider: "آپارات + جستجوی تکمیلی" });
+          }
         }
-        // If Aparat's unofficial endpoint is temporarily unavailable, keep the existing search providers.
+        // If Aparat's unofficial endpoint is temporarily unavailable or its response shape
+        // yielded no playable video records, continue with the configured search providers.
         if (env.SERPAPI_KEY) {
           const endpoint = new URL("https://serpapi.com/search.json");
           endpoint.searchParams.set("engine", "google");
