@@ -127,7 +127,7 @@ body{background:radial-gradient(ellipse at 85% 0%,#eeeaff 0,transparent 32%),lin
   <div class="home-note"><span class="note-icon">✨</span><div><strong>فیلم بعدی‌ات همین‌جاست!</strong><p>عنوان فیلم یا سریال مورد علاقه‌ات را جستجو کن، ویدئوهای مرتبط آپارات را پیدا کن و از تماشای آنلاین و دریافت آسان لذت ببر.</p></div></div>
   <div class="ad-slot" id="adHome" aria-label="تبلیغات پایین صفحه اصلی"></div>
 </section>
-<section class="section" id="linkSection"><div class="panel"><div class="panel-head"><div class="panel-icon">↗</div><div><h2>تماشا و دانلود با لینک</h2><p>لینک مستقیم صفحهٔ ویدیو را وارد کن.</p></div></div><form id="videoForm"><label class="field-label" for="videoUrl">لینک ویدیوی آپارات</label><div class="input-row"><input class="text-input" id="videoUrl" type="url" required maxlength="2048" placeholder="https://www.aparat.com/v/..." autocomplete="url"><button class="primary-btn" id="submitBtn" type="submit">نمایش ویدیو</button></div></form><div id="status" class="status" role="status" aria-live="polite"></div><section class="video-result" id="result"><button class="back-search" id="backToSearch" type="button">← بازگشت به نتایج جست‌وجو</button><div id="videoTitle" class="video-title"></div><div id="uploader" class="video-meta"></div><video id="videoPlayer" class="player" controls playsinline preload="metadata" hidden>مرورگر از پخش این ویدیو پشتیبانی نمی‌کند.</video><div class="quality-title">کیفیت‌های قابل‌دریافت</div><div id="qualities" class="quality-grid"></div><div class="pill">پخش و دانلود به دسترسی فایل ویدیو وابسته است.</div></section></div><div class="app-info" id="installInfo"><h3>📲 نصب سریع VidPik</h3><p>می‌توانی VidPik را به صفحهٔ اصلی موبایلت اضافه کنی تا مانند اپلیکیشن باز شود.</p><div class="app-actions"><button class="primary-btn" id="installNow" type="button">نصب اپلیکیشن</button><button class="secondary-btn" id="showInstallHelp" type="button">راهنمای نصب</button></div><div class="install-help" id="installHelp">اندروید: سایت را در Chrome باز کن، منوی سه‌نقطه را بزن و «Install app» یا «افزودن به صفحهٔ اصلی» را انتخاب کن. آیفون: سایت را در Safari باز کن، Share و سپس Add to Home Screen را بزن. نصب فقط وقتی ممکن است که سایت از HTTPS باز شود.</div></div></section>
+<section class="section" id="linkSection"><div class="panel"><div class="panel-head"><div class="panel-icon">↗</div><div><h2>تماشا و دانلود با لینک</h2><p>لینک مستقیم صفحهٔ ویدیو را وارد کن.</p></div></div><form id="videoForm"><label class="field-label" for="videoUrl">لینک ویدیوی آپارات</label><div class="input-row"><input class="text-input" id="videoUrl" type="url" required maxlength="2048" placeholder="https://www.aparat.com/v/..." autocomplete="url"><button class="primary-btn" id="submitBtn" type="submit">نمایش ویدیو</button></div></form><div id="status" class="status" role="status" aria-live="polite"></div><section class="video-result" id="result"><button class="back-search" id="backToSearch" type="button">← بازگشت به نتایج جست‌وجو</button><div id="videoTitle" class="video-title"></div><div id="uploader" class="video-meta"></div><iframe id="aparatFrame" class="aparat-frame" title="پخش آنلاین ویدیوی آپارات" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen loading="lazy" hidden></iframe><video id="videoPlayer" class="player" controls playsinline preload="metadata" hidden>مرورگر از پخش این ویدیو پشتیبانی نمی‌کند.</video><div class="quality-title">کیفیت‌های قابل‌دریافت</div><div id="qualities" class="quality-grid"></div><div class="pill">پخش و دانلود به دسترسی فایل ویدیو وابسته است.</div></section></div><div class="app-info" id="installInfo"><h3>📲 نصب سریع VidPik</h3><p>می‌توانی VidPik را به صفحهٔ اصلی موبایلت اضافه کنی تا مانند اپلیکیشن باز شود.</p><div class="app-actions"><button class="primary-btn" id="installNow" type="button">نصب اپلیکیشن</button><button class="secondary-btn" id="showInstallHelp" type="button">راهنمای نصب</button></div><div class="install-help" id="installHelp">اندروید: سایت را در Chrome باز کن، منوی سه‌نقطه را بزن و «Install app» یا «افزودن به صفحهٔ اصلی» را انتخاب کن. آیفون: سایت را در Safari باز کن، Share و سپس Add to Home Screen را بزن. نصب فقط وقتی ممکن است که سایت از HTTPS باز شود.</div></div></section>
 <section class="section" id="searchSection">
 <div class="panel search-results-panel">
 <form id="searchForm" class="search-form-legacy" aria-hidden="true">
@@ -162,11 +162,19 @@ body{background:radial-gradient(ellipse at 85% 0%,#eeeaff 0,transparent 32%),lin
 <label class="field-label" for="feedbackMessage">پیام تو</label><textarea id="feedbackMessage" class="text-input" maxlength="2000" required placeholder="نظر یا مشکل خود را بنویس…"></textarea>
 <button class="primary-btn" type="submit" id="feedbackSubmit">ارسال پیام</button><div id="feedbackStatus" class="status" role="status"></div></form>
 <div id="myFeedbackReplies" class="feedback-replies"></div></div>
-<div class="more-content" id="downloadsPanel"><h3>دانلودهای من</h3><p>فقط ویدیوهایی که فایل کامل آن‌ها واقعاً در VidPik ذخیره شده باشد در این فهرست نمایش داده می‌شوند. دانلودر گوشی را از برنامه Downloads بررسی کن.</p><div class="app-info" style="margin:0 0 13px"><h3>⚡ دانلود هم‌زمان هوشمند</h3><p>تا ۲ فیلم هم‌زمان دانلود می‌شوند؛ فیلم‌های بعدی خودکار در صف قرار می‌گیرند تا سرعت و حافظه گوشی بهتر مدیریت شود.</p></div><div id="downloadsList" class="downloads-list"></div><button class="secondary-btn" id="clearDownloads" type="button" style="margin-top:13px">پاک‌کردن تمام سوابق</button><p class="status">دانلودهای جدید با دانلودر اصلی دستگاه انجام می‌شوند. مرورگر اجازه نمی‌دهد VidPik پایان دانلود سیستم را خودکار تشخیص دهد؛ بنابراین درخواست دانلود به‌عنوان دانلود کامل ثبت نمی‌شود.</p></div></section>
+<div class="more-content" id="downloadsPanel"><h3>دانلودهای من</h3><p>سوابق دانلود این دستگاه را ببین، دوباره دریافت کن یا از فهرست حذف کن.</p><div class="app-info" style="margin:0 0 13px"><h3>⚡ دانلود هم‌زمان هوشمند</h3><p>تا ۲ فیلم هم‌زمان دانلود می‌شوند؛ فیلم‌های بعدی خودکار در صف قرار می‌گیرند تا سرعت و حافظه گوشی بهتر مدیریت شود.</p></div><div id="downloadsList" class="downloads-list"></div><button class="secondary-btn" id="clearDownloads" type="button" style="margin-top:13px">پاک‌کردن تمام سوابق</button><p class="status">دانلودهای اندروید با دانلودر خود گوشی انجام می‌شوند؛ این بخش سابقه درخواست را نشان می‌دهد، نه وضعیت قطعی تکمیل فایل.</p></div></section>
 <div class="footer">🎬 VidPik؛ جستجو کن، تماشا کن، دنیای ویدئو را کشف کن! 💜</div></main>
 <nav class="bottom-nav" aria-label="بخش‌های اصلی"><button class="nav-button" data-tab="searchSection" type="button"><span class="nav-icon">⌕</span><span>جست‌وجو</span></button><button class="nav-button" data-tab="linkSection" type="button"><span class="nav-icon">▶</span><span>لینک ویدیو</span></button><button class="nav-button" data-tab="moreSection" type="button"><span class="nav-icon">☰</span><span>بیشتر</span></button></nav><div id="toast" class="toast" role="status" aria-live="polite"></div>
 <script>
-const $=id=>document.getElementById(id);const form=$('videoForm'),urlInput=$('videoUrl'),submitBtn=$('submitBtn'),statusBox=$('status'),result=$('result'),titleBox=$('videoTitle'),uploaderBox=$('uploader'),player=$('videoPlayer'),qualities=$('qualities');let lastVideo=null,installPrompt=null;
+const $=id=>document.getElementById(id);const form=$('videoForm'),urlInput=$('videoUrl'),submitBtn=$('submitBtn'),statusBox=$('status'),result=$('result'),titleBox=$('videoTitle'),uploaderBox=$('uploader'),player=$('videoPlayer'),aparatFrame=$('aparatFrame'),qualities=$('qualities');let lastVideo=null,installPrompt=null;
+player.addEventListener('error',()=>{
+  if(lastVideo?.embedUrl){
+    player.pause();player.removeAttribute('src');player.hidden=true;player.load();
+    aparatFrame.src=lastVideo.embedUrl;aparatFrame.hidden=false;
+    uploaderBox.textContent='پخش با پخش‌کننده رسمی آپارات؛ لینک مستقیم در این دستگاه قابل پخش نبود.';
+    setStatus('پخش مستقیم این فایل در مرورگر ممکن نشد؛ پخش‌کننده رسمی آپارات جایگزین شد.',false);
+  }
+});
 function toast(message){const t=$('toast');t.textContent=message;t.classList.add('show');clearTimeout(toast.timer);toast.timer=setTimeout(()=>t.classList.remove('show'),3500)}
 function setStatus(message,error=false){statusBox.textContent=message;statusBox.classList.toggle('error',error)}
 function showTab(id){if(id==='downloadsSection')id='moreSection';document.querySelectorAll('.section').forEach(s=>s.classList.toggle('active',s.id===id));document.querySelectorAll('.nav-button').forEach(b=>b.classList.toggle('active',b.dataset.tab===id));$('top').classList.toggle('home-active',id==='homeSection');$('top').classList.toggle('search-active',id==='searchSection');const homeAd=$('adHome');if(homeAd){homeAd.hidden=id!=='homeSection';homeAd.style.display=id==='homeSection'?'':'none'}if(id==='moreSection')renderDownloads();if(id==='homeSection')loadPublicAds();if(id==='moreSection')loadMyFeedbackReplies();window.scrollTo({top:0,behavior:'smooth'})}
@@ -221,32 +229,13 @@ function openOfflineDB(){return new Promise((resolve,reject)=>{const request=ind
 function resumeKey(item){let h=2166136261;const v=String(item.source||item.url)+'|'+String(item.quality||'video');for(let i=0;i<v.length;i++){h^=v.charCodeAt(i);h=Math.imul(h,16777619)}return 'vp_resume_'+(h>>>0).toString(36)}
 async function resumeParts(mode,jobId,index,value){const db=await openOfflineDB();return new Promise((resolve,reject)=>{const tx=db.transaction('download_parts',mode==='getAll'?'readonly':'readwrite'),st=tx.objectStore('download_parts');let req,result;if(mode==='getAll'){req=st.getAll();req.onsuccess=()=>{result=(req.result||[]).filter(x=>x.jobId===jobId)}}else if(mode==='put')req=st.put({id:jobId+':'+index,jobId,index,blob:value,updatedAt:Date.now()});else if(mode==='delete')req=st.delete(jobId+':'+index);else if(mode==='clear'){const all=st.getAll();all.onsuccess=()=>{(all.result||[]).filter(x=>x.jobId===jobId).forEach(x=>st.delete(x.id))}}if(req&&mode!=='getAll')req.onerror=()=>reject(req.error||new Error('ذخیره بخش دانلود ناموفق بود.'));tx.oncomplete=()=>{db.close();resolve(result)};tx.onerror=()=>{db.close();reject(tx.error||new Error('خطای ذخیره‌سازی'))}})}
 async function offlineAction(mode,value){const db=await openOfflineDB();return new Promise((resolve,reject)=>{const tx=db.transaction(OFFLINE_STORE,mode==='get'||mode==='all'?'readonly':'readwrite'),store=tx.objectStore(OFFLINE_STORE);let req,result;if(mode==='all')req=store.getAll();else if(mode==='get')req=store.get(value);else if(mode==='delete')req=store.delete(value);else if(mode==='clear')req=store.clear();else if(mode==='put')req=store.put(value);if(req){req.onsuccess=()=>{result=req.result};req.onerror=()=>{db.close();reject(req.error||new Error('خطا در ذخیره‌سازی'))}}tx.oncomplete=()=>{db.close();resolve(result)};tx.onerror=()=>{db.close();reject(tx.error||new Error('خطا در ذخیره‌سازی'))};tx.onabort=()=>{db.close();reject(tx.error||new Error('ذخیره‌سازی لغو شد.'))}})}
-async function renderDownloads(){
- const box=$('downloadsList');box.replaceChildren();
- try{
-  let localList=[];try{localList=await offlineAction('all')}catch{}
-  const list=localList.filter(x=>x&&x.blob instanceof Blob&&x.blob.size>0).map(x=>({...x,kind:'saved'}));
-  $('clearDownloads').style.display=list.length?'inline-block':'none';
-  if(!list.length){box.innerHTML='<div class="empty"><div class="empty-icon">⇩</div>هنوز ویدیوی تکمیل‌شده‌ای در VidPik ذخیره نشده است.<br>دانلودهای انجام‌شده با دانلودر گوشی را در برنامه Downloads دستگاه ببین.</div>';return}
-  list.sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)).forEach(item=>{
-   const row=document.createElement('article');row.className='download-row';
-   const mark=document.createElement('div');mark.className='download-mark';mark.textContent='✓';
-   const main=document.createElement('div');main.className='row-main';
-   const title=document.createElement('strong');title.textContent=item.title||'ویدیوی ذخیره‌شده';
-   const small=document.createElement('small');small.textContent=(item.quality||'ویدیو')+' · '+formatBytes(item.size||0)+' · '+new Date(item.createdAt).toLocaleDateString('fa-IR');
-   main.append(title,small);
-   const actions=document.createElement('div');actions.className='row-actions';
-   const play=document.createElement('button');play.className='secondary-btn';play.textContent='تماشای آفلاین';play.addEventListener('click',()=>playOffline(item.id));
-   const exportBtn=document.createElement('button');exportBtn.className='secondary-btn';exportBtn.textContent='ذخیره در گوشی';exportBtn.addEventListener('click',()=>exportOfflineToPhone(item.id));
-   const remove=document.createElement('button');remove.className='delete-btn';remove.textContent='حذف';remove.addEventListener('click',async()=>{await offlineAction('delete',item.id);renderDownloads();toast('مورد از فهرست VidPik حذف شد.')});
-   actions.append(play,exportBtn,remove);row.append(mark,main,actions);box.append(row);
-  });
- }catch(error){box.innerHTML='<div class="empty">ذخیره‌سازی داخلی در این مرورگر فعال نیست: '+(error.message||'خطا')+'</div>'}
-}
+async function renderDownloads(){const box=$('downloadsList');box.replaceChildren();try{let localList=[];try{localList=await offlineAction('all')}catch{}const nativeList=readNativeHistory();const list=[...localList.map(x=>({...x,kind:'saved'})),...nativeList.map(x=>({...x,kind:'native'}))];$('clearDownloads').style.display=list.length?'inline-block':'none';if(!list.length){box.innerHTML='<div class=\"empty\"><div class=\"empty-icon\">⇩</div>هنوز سابقه‌ای وجود ندارد.<br>پس از درخواست دانلود، سابقه آن در این بخش ثبت می‌شود.</div>';return}list.sort((a,b)=>(b.createdAt||0)-(a.createdAt||0)).forEach(item=>{const row=document.createElement('article');row.className='download-row';const mark=document.createElement('div');mark.className='download-mark';mark.textContent=item.kind==='native'?'⇩':'✓';const main=document.createElement('div');main.className='row-main';const title=document.createElement('strong');title.textContent=item.title||'ویدیوی ذخیره‌شده';const small=document.createElement('small');small.textContent=item.kind==='native'?'به دانلودهای گوشی فرستاده شد · تکمیل را در برنامه Downloads بررسی کن · '+new Date(item.createdAt).toLocaleDateString('fa-IR'):(item.quality||'ویدیو')+' · '+formatBytes(item.size||0)+' · '+new Date(item.createdAt).toLocaleDateString('fa-IR');main.append(title,small);const actions=document.createElement('div');actions.className='row-actions';const play=document.createElement('button');play.className='secondary-btn';play.textContent='تماشای آفلاین';play.addEventListener('click',()=>playOffline(item.id));const exportBtn=document.createElement('button');exportBtn.className='secondary-btn';exportBtn.textContent='ذخیره در گوشی';exportBtn.addEventListener('click',()=>exportOfflineToPhone(item.id));if(item.kind==='native'){play.remove();exportBtn.remove()}const remove=document.createElement('button');remove.className='delete-btn';remove.textContent='حذف';remove.addEventListener('click',async()=>{if(item.kind==='native')writeNativeHistory(readNativeHistory().filter(x=>x.id!==item.id));else await offlineAction('delete',item.id);renderDownloads();toast('مورد از فهرست VidPik حذف شد؛ فایل دانلودشده در گوشی جداگانه باقی می‌ماند.')});actions.append(play,exportBtn,remove);row.append(mark,main,actions);box.append(row)})}catch(error){box.innerHTML='<div class=\"empty\">ذخیره‌سازی داخلی در این مرورگر فعال نیست: '+(error.message||'خطا')+'</div>'}}
+async function exportOfflineToPhone(id){let objectUrl='';try{const item=await offlineAction('get',id);if(!item||!item.blob||!item.blob.size)throw new Error('فایل ذخیره‌شده پیدا نشد.');const rawTitle=String(item.title||'VidPik-video').replace(/[\\/:*?"<>|\u0000-\u001f]/g,' ').replace(/\s+/g,' ').trim().slice(0,90)||'VidPik-video';const mime=(item.blob.type||item.type||'video/mp4').toLowerCase();const ext=mime.includes('webm')?'webm':mime.includes('quicktime')?'mov':mime.includes('matroska')?'mkv':'mp4';objectUrl=URL.createObjectURL(item.blob);const a=document.createElement('a');a.href=objectUrl;a.download=rawTitle+'-'+String(item.quality||'video').replace(/[^a-z0-9_-]/gi,'_')+'.'+ext;a.style.display='none';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(objectUrl),60000);toast('دانلود به حافظه گوشی فرستاده شد. پوشه Downloads را بررسی کن؛ ممکن است گالری کمی بعد فایل را نشان دهد.')}catch(error){if(objectUrl)URL.revokeObjectURL(objectUrl);toast(error.message||'ذخیره در گوشی ناموفق بود.')}}
+const NATIVE_HISTORY_KEY='vp_native_download_history_v1';
 function readNativeHistory(){try{return JSON.parse(localStorage.getItem(NATIVE_HISTORY_KEY)||'[]').filter(x=>x&&x.id)}catch{return []}}
 function writeNativeHistory(items){try{localStorage.setItem(NATIVE_HISTORY_KEY,JSON.stringify(items.slice(0,100)))}catch{}}
 function formatBytes(bytes){if(!bytes)return 'حجم نامشخص';const units=['B','KB','MB','GB'];let n=bytes,i=0;while(n>=1024&&i<3){n/=1024;i++}return n.toFixed(i?1:0)+' '+units[i]}
-async function playOffline(id){try{const item=await offlineAction('get',id);if(!item||!item.blob)throw new Error('فایل ذخیره‌شده پیدا نشد.');showTab('linkSection');player.pause();if(player.dataset.offlineUrl)URL.revokeObjectURL(player.dataset.offlineUrl);const objectUrl=URL.createObjectURL(item.blob);player.dataset.offlineUrl=objectUrl;player.src=objectUrl;player.hidden=false;player.load();titleBox.textContent=item.title||'ویدیوی آفلاین';uploaderBox.textContent='پخش آفلاین از حافظه داخلی VidPik';result.style.display='block';result.scrollIntoView({behavior:'smooth',block:'start'})}catch(error){toast(error.message||'پخش آفلاین ناموفق بود.')}}
+async function playOffline(id){try{const item=await offlineAction('get',id);if(!item||!item.blob)throw new Error('فایل ذخیره‌شده پیدا نشد.');showTab('linkSection');aparatFrame.hidden=true;aparatFrame.removeAttribute('src');player.pause();if(player.dataset.offlineUrl)URL.revokeObjectURL(player.dataset.offlineUrl);const objectUrl=URL.createObjectURL(item.blob);player.dataset.offlineUrl=objectUrl;player.src=objectUrl;player.hidden=false;player.load();titleBox.textContent=item.title||'ویدیوی آفلاین';uploaderBox.textContent='پخش آفلاین از حافظه داخلی VidPik';result.style.display='block';result.scrollIntoView({behavior:'smooth',block:'start'})}catch(error){toast(error.message||'پخش آفلاین ناموفق بود.')}}
 $('clearDownloads').addEventListener('click',async()=>{if(confirm('تمام موارد از فهرست VidPik حذف شوند؟ فایل‌های دانلودشده در گوشی پاک نمی‌شوند.')){try{await offlineAction('clear')}catch{}writeNativeHistory([]);renderDownloads();toast('فهرست دانلودهای VidPik پاک شد؛ فایل‌های دانلودشده در گوشی حذف نمی‌شوند.')}});
 const activeDownloads=new Set(),downloadQueue=[];const taskByButton=new WeakMap();const MAX_SIMULTANEOUS_DOWNLOADS=2;
 window.addEventListener('pagehide',()=>{for(const task of activeDownloads){task.controllers.forEach(controller=>{try{controller.abort()}catch{}})}});
@@ -265,23 +254,25 @@ controls.append(pause,cancel);
 }else controls.remove();
 }
 async function downloadItem(item,button){
- // Let the browser / Android Download Manager handle the transfer.
- // A normal web page cannot read the system download manager's completion state.
- if(!item || !item.url) throw new Error('لینک مستقیم این کیفیت موجود نیست.');
- const directUrl='/api/download?url='+encodeURIComponent(item.url)+'&quality='+encodeURIComponent(item.quality||'video');
- const anchor=document.createElement('a');
- anchor.href=directUrl;
- anchor.download='';
- anchor.rel='noopener';
- anchor.style.display='none';
- document.body.append(anchor);
- anchor.click();
- anchor.remove();
- trackDownload('download_requested',item);
- if(button){button.disabled=true;button.textContent='ارسال به دانلودر دستگاه…';}
- setStatus('دانلود به دانلودر دستگاه سپرده شد. پس از تکمیل، فایل را در Downloads گوشی بررسی کن. VidPik وضعیت پایان دانلودر دستگاه را خودکار دریافت نمی‌کند.');
- toast('دانلود به دانلودر دستگاه فرستاده شد.');
- if(button)setTimeout(()=>{button.disabled=false;button.textContent='دانلود دوباره';},1800);
+ // Android Chrome/WebView should hand the stream to the system download manager.
+ // Unlike a page-owned fetch/blob, a native browser download can continue after this page closes.
+ if(/Android/i.test(navigator.userAgent)){
+  const directUrl='/api/download?url='+encodeURIComponent(item.url)+'&quality='+encodeURIComponent(item.quality||'video');
+  const anchor=document.createElement('a');anchor.href=directUrl;anchor.download='';anchor.rel='noopener';anchor.style.display='none';
+  const historyItem={id:'native_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,8),title:String(item.title||'ویدیوی آپارات').slice(0,240),quality:String(item.quality||'کیفیت موجود').slice(0,60),source:String(item.source||''),url:String(item.url||''),createdAt:Date.now()};
+  writeNativeHistory([historyItem,...readNativeHistory().filter(x=>x.url!==historyItem.url)].slice(0,100));
+  document.body.append(anchor);anchor.click();anchor.remove();
+  renderDownloads();
+  trackDownload('download_started',item);
+  if(button){button.disabled=true;button.textContent='ارسال به دانلودهای گوشی…';}
+  setStatus('درخواست دانلود به دانلودر گوشی فرستاده شد. تکمیل دانلود را در اعلان‌ها یا برنامه Downloads گوشی بررسی کن؛ این فهرست فقط سابقه درخواست را نشان می‌دهد.');
+  toast('درخواست دانلود به گوشی فرستاده شد؛ سابقه آن در بخش بیشتر ثبت شد.');
+  if(button){setTimeout(()=>{button.disabled=false;button.textContent='دانلود دوباره';},1800);}
+  return;
+ }
+ try{const saved=await resumeParts('getAll',resumeKey(item));if(saved.length){const bytes=saved.reduce((n,x)=>n+(x.blob?.size||0),0);toast('بخش‌های قبلی پیدا شد؛ '+formatBytes(bytes)+' حفظ شده و دانلود از ادامه آن پیش می‌رود.')}}catch{}
+const task={button,paused:false,cancelled:false,controllers:[],waiters:[],queued:true};taskByButton.set(button,task);trackDownload('download_started',item);
+return new Promise((resolve,reject)=>{downloadQueue.push({item,button,task,resolve,reject});button.disabled=true;button.textContent='در صف دانلود…';setDownloadControls(button,'active');pumpDownloadQueue();});
 }
 async function runDownloadItem(item,button,task){
 task.queued=false;
@@ -421,67 +412,8 @@ if(button){button.disabled=false;button.textContent=oldText;setDownloadControls(
 activeDownloads.delete(task);taskByButton.delete(button);pumpDownloadQueue();
 }
 }
-form.addEventListener('submit',async event=>{
- event.preventDefault();
- const raw=urlInput.value.trim();
- result.style.display='none';qualities.replaceChildren();
- player.pause();player.removeAttribute('src');player.removeAttribute('poster');player.load();player.hidden=true;
- submitBtn.disabled=true;submitBtn.textContent='در حال بررسی…';
- setStatus('در حال دریافت اطلاعات و کیفیت‌ها…');
- try{
-  const u=new URL(raw);
-  if(!/(^|\.)aparat\.(com|ir)$/i.test(u.hostname))throw new Error('لطفاً لینک معتبر آپارات را وارد کن.');
-  const parts=u.pathname.split('/').filter(Boolean);
-  let videoId='';
-  if(parts[0]==='v'&&parts[1])videoId=parts[1];
-  else if(parts[0]==='video'&&parts[1]==='video'&&parts[2]==='embed'&&parts[3]==='videohash'&&parts[4])videoId=parts[4];
-  if(!/^[A-Za-z0-9_-]{3,40}$/.test(videoId))throw new Error('شناسه ویدیو از لینک تشخیص داده نشد.');
-  result.style.display='block';titleBox.textContent='ویدیوی آپارات';uploaderBox.textContent='در حال آماده‌سازی پلیر داخلی VidPik…';
-  const response=await fetch('/api/resolve?url='+encodeURIComponent(raw),{cache:'no-store'});
-  const data=await response.json();
-  if(!response.ok)throw new Error(data.error||'دریافت اطلاعات ویدیو ناموفق بود.');
-  lastVideo={title:data.title||'ویدیوی آپارات',uploader:data.uploader||'',source:raw};
-  titleBox.textContent=lastVideo.title;
-  uploaderBox.textContent=lastVideo.uploader?'بارگذار: '+lastVideo.uploader:'پخش در پلیر داخلی VidPik';
-  if(data.thumbnail)player.poster=data.thumbnail;
-  const downloads=Array.isArray(data.downloads)?data.downloads:[];
-  const playableSources=(Array.isArray(data.mediaSources)?data.mediaSources:downloads).filter(x=>x&&typeof x.url==='string');
-  let playbackIndex=0;
-  const showNoSource=()=>{
-   player.pause();player.removeAttribute('src');player.hidden=true;player.load();
-   uploaderBox.textContent='منبع مستقیم پخش برای این ویدیو پیدا نشد.';
-   setStatus(data.warning||'آپارات برای این ویدیو لینک مستقیم قابل‌دسترسی ارائه نکرد. هیچ صفحه‌ای به سایت آپارات باز نمی‌شود.',true);
-  };
-  const loadPlaybackSource=()=>{
-   const source=playableSources[playbackIndex];if(!source)return false;
-   player.pause();player.src='/api/stream?url='+encodeURIComponent(source.url);player.hidden=false;player.load();return true;
-  };
-  player.onerror=()=>{
-   if(playbackIndex+1<playableSources.length){playbackIndex++;loadPlaybackSource();setStatus('منبع فعلی پخش نشد؛ کیفیت بعدی در پلیر داخلی امتحان می‌شود.',false)}
-   else{player.hidden=true;setStatus('منابع مستقیم دریافت شدند، اما مرورگر نتوانست آن‌ها را پخش کند. لینک‌های کیفیت برای دانلود همچنان در دسترس‌اند.',true)}
-  };
-  if(playableSources.length){loadPlaybackSource();}
-  else{showNoSource();}
-  downloads.forEach(item=>{
-   const b=document.createElement('button');b.type='button';b.className='quality-button';
-   b.textContent='⬇ '+(item.quality||'کیفیت موجود');
-   b.addEventListener('click',async()=>{
-    if(b.disabled)return;
-    try{await downloadItem({...item,title:lastVideo.title,uploader:lastVideo.uploader,source:raw},b)}
-    catch(error){toast(error.message||'آماده‌سازی دانلود ناموفق بود.')}
-   });
-   b.addEventListener('contextmenu',e=>e.preventDefault());qualities.append(b);
-  });
-  if(downloads.length){setStatus('کیفیت‌های قابل‌دریافت آماده‌اند. برای پخش، پلیر داخلی VidPik استفاده می‌شود؛ دانلود با دانلودر دستگاه انجام می‌شود.',false)}
-  else if(playableSources.length){setStatus('پخش داخلی آماده است، اما API برای این ویدیو کیفیت دانلود مستقیم برنگرداند.',false)}
-  result.scrollIntoView({behavior:'smooth',block:'start'});
- }catch(err){
-  result.style.display='block';titleBox.textContent='ویدیوی آپارات';
-  uploaderBox.textContent='پخش‌کننده داخلی VidPik';
-  player.pause();player.removeAttribute('src');player.hidden=true;player.load();
-  setStatus(err.message||'دریافت اطلاعات ویدیو ناموفق بود. هیچ انتقالی به سایت آپارات انجام نمی‌شود.',true);
- }finally{submitBtn.disabled=false;submitBtn.textContent='نمایش ویدیو'}
-});
+form.addEventListener('submit',async event=>{event.preventDefault();const raw=urlInput.value.trim();result.style.display='none';qualities.replaceChildren();player.pause();player.removeAttribute('src');player.removeAttribute('poster');player.load();player.hidden=true;aparatFrame.removeAttribute('src');aparatFrame.hidden=true;submitBtn.disabled=true;submitBtn.textContent='در حال بررسی…';setStatus('در حال دریافت اطلاعات ویدیو…');let videoId='';try{const u=new URL(raw);if(!/(^|\.)aparat\.(com|ir)$/i.test(u.hostname))throw new Error('لطفاً لینک معتبر آپارات را وارد کن.');const parts=u.pathname.split('/').filter(Boolean);if(parts[0]==='v'&&parts[1])videoId=parts[1];else if(parts[0]==='video'&&parts[1]==='video'&&parts[2]==='embed'&&parts[3]==='videohash'&&parts[4])videoId=parts[4];if(!/^[A-Za-z0-9_-]{3,32}$/.test(videoId))throw new Error('شناسهٔ ویدیو از لینک تشخیص داده نشد. لینک صفحهٔ ویدیو را وارد کن.');result.style.display='block';titleBox.textContent='ویدیوی آپارات';uploaderBox.textContent='در حال آماده‌سازی پخش داخلی VidPik…';setStatus('در حال دریافت اطلاعات ویدیو و کیفیت‌ها…');const response=await fetch('/api/resolve?url='+encodeURIComponent(raw));const data=await response.json();if(!response.ok)throw new Error(data.error||'دریافت کیفیت‌های دانلود ناموفق بود.');lastVideo={title:data.title||'ویدیوی آپارات',uploader:data.uploader||'',source:raw,embedUrl:data.embedUrl||''};titleBox.textContent=lastVideo.title;uploaderBox.textContent=lastVideo.uploader?'بارگذار: '+lastVideo.uploader:'پخش آنلاین از آپارات';if(data.thumbnail)player.poster=data.thumbnail;const playableSources=(data.mediaSources||data.downloads||[]).filter(x=>x&&x.url);let playbackIndex=0;const clearInternalPlayer=()=>{player.pause();player.removeAttribute('src');player.hidden=true;player.load()};const showOfficialFallback=()=>{clearInternalPlayer();if(data.embedUrl){aparatFrame.src=data.embedUrl;aparatFrame.hidden=false;uploaderBox.textContent='پخش با پخش‌کننده رسمی آپارات؛ کیفیت‌های دانلود در فهرست پایین باقی می‌مانند.';setStatus('پخش داخلی با منابع مستقیم موفق نشد؛ پخش‌کننده رسمی آپارات امتحان شد.',false)}else{aparatFrame.removeAttribute('src');aparatFrame.hidden=true;uploaderBox.textContent='پخش مستقیم یا پخش‌کننده جایگزین برای این ویدیو در دسترس نیست.';setStatus('آپارات برای این ویدیو منبع قابل پخش ارائه نکرد.',true)}};const loadPlaybackSource=()=>{const source=playableSources[playbackIndex];if(!source||!source.url)return false;aparatFrame.removeAttribute('src');aparatFrame.hidden=true;player.pause();player.src='/api/stream?url='+encodeURIComponent(source.url);player.hidden=false;player.load();return true};player.onerror=()=>{if(playbackIndex+1<playableSources.length){playbackIndex++;loadPlaybackSource();setStatus('این منبع پخش نشد؛ کیفیت بعدی به‌صورت خودکار امتحان می‌شود.',false)}else{showOfficialFallback()}};clearInternalPlayer();aparatFrame.removeAttribute('src');aparatFrame.hidden=true;if(playableSources.length){loadPlaybackSource();uploaderBox.textContent=lastVideo.uploader?'بارگذار: '+lastVideo.uploader:'پخش در پلیر داخلی VidPik'}else{showOfficialFallback()}(data.downloads||[]).forEach(item=>{const b=document.createElement('button');b.type='button';b.className='quality-button';b.textContent='⬇ '+(item.quality||'کیفیت موجود');b.addEventListener('click',async()=>{if(!item.url){toast('لینک دانلود این کیفیت از آپارات دریافت نشده است.');return}if(b.disabled)return;const oldText=b.textContent;b.disabled=true;b.textContent='در حال دانلود…';try{await downloadItem({...item,title:lastVideo.title,uploader:lastVideo.uploader,source:raw},b)}catch(error){toast(error.message||'دانلود ناموفق بود.')}finally{b.disabled=false;b.textContent=oldText}});b.addEventListener('contextmenu',e=>e.preventDefault());qualities.append(b)});setStatus((data.downloads||[]).length?'آماده است؛ پخش آنلاین و کیفیت‌های دانلود در دسترس‌اند.':(data.embedUrl?'پخش‌کننده رسمی آپارات فعال شد؛ لینک دانلود مستقیم برای این ویدیو در دسترس نیست.':'لینک دانلود مستقیم برای این ویدیو پیدا نشد.'),false);result.scrollIntoView({behavior:'smooth',block:'start'}) }catch(err){if(videoId){result.style.display='block';titleBox.textContent='ویدیوی آپارات';uploaderBox.textContent='تلاش برای پخش با پخش‌کننده رسمی آپارات…';aparatFrame.src='https://www.aparat.com/video/video/embed/videohash/'+encodeURIComponent(videoId)+'/vt/frame';aparatFrame.hidden=false;player.hidden=true;setStatus('اطلاعات دانلود دریافت نشد؛ پخش‌کننده رسمی آپارات را امتحان می‌کنیم. '+(err.message||''),false)}else{setStatus(err.message||'خطای نامشخص رخ داد.',true)}}finally{submitBtn.disabled=false;submitBtn.textContent='نمایش ویدیو'}});
+let searchPage=1,searchTerm='',searchHasMore=false,searchBusy=false,searchNext='';
 async function performSearch(append=false){const q=append?searchTerm:$('searchQuery').value.trim();if(!q||searchBusy)return;const btn=$('searchBtn'),status=$('searchStatus'),box=$('searchResults'),more=$('loadMoreResults');if(!append){searchTerm=q;searchPage=1;searchNext='';box.replaceChildren();}searchBusy=true;btn.disabled=true;btn.textContent='در حال جست‌وجو…';more.disabled=true;status.textContent=append?'در حال دریافت ویدیوهای بیشتر…':'در حال جست‌وجوی ویدیوهای آپارات…';status.classList.remove('error');try{const r=await fetch('/api/search?q='+encodeURIComponent(q)+'&page='+searchPage+(append&&searchNext?'&next='+encodeURIComponent(searchNext):''));const data=await r.json();if(!r.ok)throw new Error(data.error||'جست‌وجو ناموفق بود.');if(!Array.isArray(data.items)||!data.items.length){if(!append)status.textContent='ویدیوی قابل‌پشتیبانی در آپارات پیدا نشد. نام فیلم دیگری را جست‌وجو کن یا لینک مستقیم آپارات را در بخش لینک ویدیو وارد کن.';searchHasMore=false;more.style.display='none';return}const seen=new Set([...box.querySelectorAll('[data-result-url]')].map(el=>el.dataset.resultUrl));const items=data.items.filter(item=>item.isAparat&&item.url&&/^https:\/\/(?:www\.)?aparat\.(?:com|ir)\/v\/[a-zA-Z0-9_-]{3,40}(?:[/?#]|$)/i.test(item.url)&&!seen.has(item.url));items.forEach(item=>{const card=document.createElement('article');card.className='result-item';card.dataset.resultUrl=item.url;if(item.thumbnail){const img=document.createElement('img');img.className='thumb';img.src=item.thumbnail;img.alt='';img.loading='lazy';img.onerror=()=>img.remove();card.append(img)}const info=document.createElement('div');info.className='result-info';const title=document.createElement('div');title.className='result-title';title.textContent=item.title||'نتیجهٔ وب';const sub=document.createElement('div');sub.className='result-sub';sub.textContent=item.source||item.uploader||'وب';info.append(title,sub);if(item.snippet){const snippet=document.createElement('div');snippet.className='result-sub';snippet.style.lineHeight='1.8';snippet.textContent=item.snippet;info.append(snippet)}const actions=document.createElement('div');actions.className='result-actions';const open=document.createElement('button');open.className='primary-btn';open.type='button';open.textContent='تماشا / کیفیت‌ها';open.addEventListener('click',()=>{showTab('linkSection');urlInput.value=item.url;form.requestSubmit()});const quick=document.createElement('button');quick.className='secondary-btn';quick.type='button';quick.textContent='⬇ دانلود سریع';quick.addEventListener('click',async()=>{quick.disabled=true;quick.textContent='در حال آماده‌سازی…';try{const rr=await fetch('/api/resolve?url='+encodeURIComponent(item.url));const resolved=await rr.json();if(!rr.ok)throw new Error(resolved.error||'دریافت لینک دانلود ناموفق بود.');const choices=resolved.downloads||[];if(!choices.length)throw new Error('لینک دانلود مستقیم برای این فیلم پیدا نشد.');const choice=choices[0];const downloadButton=document.createElement('button');downloadButton.type='button';downloadButton.className='quality-button';downloadButton.textContent='⬇ '+(choice.quality||'دانلود');downloadButton.style.marginTop='8px';info.append(downloadButton);quick.textContent='به صف دانلود اضافه شد';await downloadItem({...choice,title:resolved.title||item.title||'ویدیوی آپارات',uploader:resolved.uploader||item.uploader||'',source:item.url},downloadButton)}catch(error){quick.disabled=false;quick.textContent='⬇ تلاش دوباره';toast(error.message||'آماده‌سازی دانلود ناموفق بود.')}});actions.append(open,quick);info.append(actions);card.append(info);box.append(card)});status.textContent='ویدیوهای آپارات: '+box.children.length;searchHasMore=Boolean(data.hasMore);searchNext=String(data.next||'');searchPage++;more.style.display=searchHasMore?'block':'none';if(!items.length&&!append)status.textContent='ویدیوی جدیدی از آپارات پیدا نشد.'}catch(err){status.textContent=err.message||'جست‌وجو ناموفق بود.';status.classList.add('error');more.style.display='none'}finally{searchBusy=false;btn.disabled=false;btn.textContent='جست‌وجو';more.disabled=false}}
 $('searchForm').addEventListener('submit',event=>{event.preventDefault();performSearch(false)});$('loadMoreResults').addEventListener('click',()=>{if(searchHasMore)performSearch(true)});
 window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();installPrompt=e});window.addEventListener('appinstalled',()=>toast('VidPik به دستگاه اضافه شد.'));async function installApp(){if(installPrompt){installPrompt.prompt();const choice=await installPrompt.userChoice;toast(choice.outcome==='accepted'?'درخواست نصب پذیرفته شد.':'نصب لغو شد.');installPrompt=null}else{$('installHelp').classList.add('show');$('installInfo').scrollIntoView({behavior:'smooth',block:'center'});toast('راهنمای نصب نمایش داده شد.')}}$('openInstall').addEventListener('click',installApp);$('installNow').addEventListener('click',installApp);$('showInstallHelp').addEventListener('click',()=>$('installHelp').classList.toggle('show'));if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}));async function loadPublicAds(){try{const homeSection=$('homeSection'),homeAd=$('adHome');if(!homeSection||!homeAd||!homeSection.classList.contains('active')){if(homeAd){homeAd.hidden=true;homeAd.style.display='none'}return}homeAd.hidden=false;homeAd.style.display='';const r=await fetch('/api/ads',{cache:'no-store'});if(!r.ok)return;const data=await r.json();const ads=data.ads||{};const slots={home:$('adHome')};Object.entries(slots).forEach(([key,box])=>{const ad=ads[key];if(!ad||!ad.enabled||!ad.url)return;let target;try{target=new URL(ad.url,location.href);if(!['http:','https:'].includes(target.protocol))return}catch{return}box.replaceChildren();const label=document.createElement('span');label.className='ad-slot-label';label.textContent='تبلیغات';const link=document.createElement('a');link.href=target.href;link.target='_blank';link.rel='noopener noreferrer sponsored';if(ad.image){try{const imgUrl=new URL(ad.image,location.href);if(['http:','https:'].includes(imgUrl.protocol)){const img=document.createElement('img');img.src=imgUrl.href;img.alt=ad.title||'تبلیغ';img.loading='lazy';link.append(img)}}catch{}}const copy=document.createElement('div');copy.className='ad-slot-copy';const title=document.createElement('strong');title.textContent=ad.title||'پیشنهاد ویژه';const desc=document.createElement('p');desc.textContent=ad.text||'';const cta=document.createElement('span');cta.className='ad-slot-cta';cta.textContent=(ad.button||'مشاهده تبلیغ')+' ↗';copy.append(title,desc,cta);link.append(copy);link.addEventListener('click',()=>fetch('/api/track',{method:'POST',headers:{'content-type':'application/json'},keepalive:true,body:JSON.stringify({type:'ad_click',adId:key,page:key})}).catch(()=>{}));box.append(label,link);box.classList.add('show');fetch('/api/track',{method:'POST',headers:{'content-type':'application/json'},keepalive:true,body:JSON.stringify({type:'ad_impression',adId:key,page:key})}).catch(()=>{})})}catch{}}
@@ -498,4 +430,89 @@ loadMyFeedbackReplies();
 }catch(e){}}
 )();
 </script>
+
+<script id="vidpik-search-navigation-guard">
+(() => {
+  const byId = (id) => document.getElementById(id);
+  const activateSearch = () => {
+    document.querySelectorAll('.section').forEach(section => section.classList.toggle('active', section.id === 'searchSection'));
+    document.querySelectorAll('.nav-button').forEach(button => button.classList.toggle('active', button.dataset.tab === 'searchSection'));
+    const top = byId('top');
+    if (top) { top.classList.remove('home-active'); top.classList.add('search-active'); }
+    const ad = byId('adHome');
+    if (ad) { ad.hidden = true; ad.style.display = 'none'; }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+  const run = async () => {
+    const input = byId('heroSearch');
+    const query = (input?.value || '').trim();
+    const status = byId('searchStatus');
+    const results = byId('searchResults');
+    const button = byId('heroSearchBtn');
+    if (!query) {
+      if (typeof window.toast === 'function') window.toast('نام فیلم یا کلمهٔ کلیدی را وارد کن.');
+      else if (status) status.textContent = 'نام فیلم یا کلمهٔ کلیدی را وارد کن.';
+      input?.focus();
+      return;
+    }
+    activateSearch();
+    if (!status || !results) return;
+    results.replaceChildren();
+    status.classList.remove('error');
+    status.textContent = 'در حال جست‌وجوی ویدیوهای آپارات…';
+    if (button) { button.disabled = true; button.textContent = 'در حال جست‌وجو…'; }
+    try {
+      const response = await fetch('/api/search?q=' + encodeURIComponent(query) + '&page=1', {
+        method: 'GET', headers: { 'accept': 'application/json' }, cache: 'no-store'
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data?.error || ('خطای جست‌وجو: ' + response.status));
+      if (!Array.isArray(data.items) || data.items.length === 0) {
+        status.textContent = 'نتیجه‌ای پیدا نشد. لطفاً عبارت دیگری را امتحان کن.';
+        return;
+      }
+      let count = 0;
+      for (const item of data.items) {
+        const url = String(item?.url || '');
+        if (!/^https:\/\/(?:www\.)?aparat\.(?:com|ir)\/v\/[a-zA-Z0-9_-]{3,40}(?:[/?#]|$)/i.test(url)) continue;
+        const card = document.createElement('article');
+        card.className = 'result-item';
+        if (item.thumbnail) {
+          const image = document.createElement('img'); image.className = 'thumb';
+          image.src = item.thumbnail; image.alt = ''; image.loading = 'lazy';
+          image.onerror = () => image.remove(); card.append(image);
+        }
+        const info = document.createElement('div'); info.className = 'result-info';
+        const title = document.createElement('div'); title.className = 'result-title';
+        title.textContent = item.title || 'ویدیوی آپارات';
+        const meta = document.createElement('div'); meta.className = 'result-sub';
+        meta.textContent = item.uploader || item.source || 'آپارات';
+        const open = document.createElement('button'); open.type = 'button'; open.className = 'primary-btn';
+        open.textContent = 'نمایش ویدیو و کیفیت‌ها';
+        open.addEventListener('click', () => {
+          document.querySelectorAll('.section').forEach(section => section.classList.toggle('active', section.id === 'linkSection'));
+          document.querySelectorAll('.nav-button').forEach(button => button.classList.toggle('active', button.dataset.tab === 'linkSection'));
+          const link = byId('videoUrl'); if (link) link.value = url;
+          const form = byId('videoForm'); if (form) form.requestSubmit();
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+        info.append(title, meta, open); card.append(info); results.append(card); count++;
+      }
+      status.textContent = count ? count + ' نتیجه پیدا شد.' : 'پاسخ جست‌وجو ویدیو قابل‌نمایش نداشت.';
+    } catch (error) {
+      status.textContent = error?.message || 'ارتباط با سرویس جست‌وجو برقرار نشد.';
+      status.classList.add('error');
+    } finally {
+      if (button) { button.disabled = false; button.textContent = 'جست‌وجو'; }
+    }
+  };
+  const button = byId('heroSearchBtn');
+  const input = byId('heroSearch');
+  if (button) button.addEventListener('click', event => { event.preventDefault(); event.stopImmediatePropagation(); run(); }, true);
+  if (input) input.addEventListener('keydown', event => {
+    if (event.key === 'Enter') { event.preventDefault(); event.stopImmediatePropagation(); run(); }
+  }, true);
+})();
+</script>
+
 </body></html>

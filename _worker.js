@@ -481,14 +481,14 @@ export default {
             const uid = String(v.uid || v.video_hash || v.videohash || v.hash_id);
             if (seen.has(uid)) return null;
             seen.add(uid);
-            const candidates = [v.small_poster, v.medium_poster, v.big_poster, v.poster, v.thumbnail, v.image, v.pic, v.uploader?.icon];
+            const candidates = [v.small_poster, v.medium_poster, v.big_poster, v.poster, v.thumbnail, v.image, v.pic];
             const thumbnail = candidates.find(x => typeof x === "string" && /^https:\/\//i.test(x)) || "";
             return {
               title: String(v.title || v.name || "ویدیوی آپارات").slice(0, 300),
               url: "https://www.aparat.com/v/" + uid,
               thumbnail,
               snippet: String(v.description || v.meta_description || "").slice(0, 500),
-              uploader: String(v.sender_name || v.username || v.owner?.name || v.uploader?.name || "آپارات").slice(0, 100),
+              uploader: String(v.sender_name || v.username || v.owner?.name || "آپارات").slice(0, 100),
               source: "جستجوی مستقیم آپارات",
               isAparat: true
             };
