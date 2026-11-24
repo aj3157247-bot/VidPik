@@ -231,6 +231,18 @@ async function adminApi(request, env, url) {
   }
   if (!(await validAdmin(request,env))) return json({error:"نشست مدیر معتبر نیست؛ دوباره وارد شو."},401);
   if (!db) return json({error:"پایگاه داده D1 وصل نیست. طبق فایل ADMIN-SETUP-FA.txt دیتابیس را بساز و binding با نام DB اضافه کن."},503);
+  if (url.pathname === "/api/admin/feedback" && request.method === "GET") {
+    const rows = await db.prepare("SELECT id,session_id,type,name,contact,message,reply,status,created_at,replied_at FROM feedback_messages ORDER BY id DESC LIMIT 300").all();
+    return json({items:rows.results||[]});
+  }
+  if (url.pathname === "/api/admin/feedback/reply" && request.method === "POST") {
+    let body={}; try { body=await request.json(); } catch { return json({error:"داده‌های پاسخ معتبر نیست."},400); }
+    const id=Number(body.id), reply=String(body.reply||"").trim();
+    if (!Number.isSafeInteger(id) || id<1 || reply.length<1 || reply.length>2000) return json({error:"شناسه پیام یا متن پاسخ معتبر نیست."},400);
+    const result=await db.prepare("UPDATE feedback_messages SET reply=?,status='answered',replied_at=? WHERE id=?").bind(reply,new Date().toISOString(),id).run();
+    if (!result.meta?.changes) return json({error:"پیام پیدا نشد."},404);
+    return json({ok:true});
+  }
   if (url.pathname === "/api/admin/upload-image" && request.method === "POST") {
     const bucket=env.VIDPIK_MEDIA;
     if(!bucket) return json({error:"فضای ذخیره‌سازی R2 وصل نیست؛ binding با نام VIDPIK_MEDIA لازم است."},503);
@@ -284,7 +296,7 @@ async function adminApi(request, env, url) {
   }
   if (url.pathname === "/api/admin/ads" && request.method === "PUT") {
     let body={}; try { body=await request.json(); } catch { return json({error:"داده‌های ارسالی معتبر نیست."},400); }
-    const allowed=["home","before","during"];
+    const allowed=["home"];
     const stmts=[];
     for (const key of allowed) {
       const item=body[key]||{};
@@ -352,6 +364,23 @@ export default {
       });
     }
 
+    if (url.pathname === "/api/feedback" && request.method === "POST") {
+      const db=getDb(env); if(!db) return json({error:"سامانه پیام‌ها هنوز به پایگاه داده متصل نشده است."},503);
+      let body={}; try { body=await request.json(); } catch { return json({error:"پیام ارسالی معتبر نیست."},400); }
+      const session=String(request.headers.get("x-vidpik-session")||"").trim().slice(0,80);
+      const type=String(body.type||"نظر").trim().slice(0,40), name=String(body.name||"").trim().slice(0,60), contact=String(body.contact||"").trim().slice(0,120), message=String(body.message||"").trim();
+      if(!/^[A-Za-z0-9_-]{8,80}$/.test(session)) return json({error:"شناسه نشست معتبر نیست؛ صفحه را تازه‌سازی کن."},400);
+      if(!["نظر","پیشنهاد","گزارش مشکل","پشتیبانی"].includes(type) || message.length<4 || message.length>2000) return json({error:"نوع یا متن پیام معتبر نیست؛ پیام باید بین ۴ تا ۲۰۰۰ حرف باشد."},400);
+      await db.prepare("INSERT INTO feedback_messages(session_id,type,name,contact,message,status,created_at) VALUES(?,?,?,?,?,'new',?)").bind(session,type,name,contact,message,new Date().toISOString()).run();
+      return json({ok:true});
+    }
+    if (url.pathname === "/api/feedback" && request.method === "GET") {
+      const db=getDb(env); if(!db) return json({error:"سامانه پیام‌ها هنوز آماده نیست."},503);
+      const session=String(url.searchParams.get("session")||"").trim().slice(0,80);
+      if(!/^[A-Za-z0-9_-]{8,80}$/.test(session)) return json({error:"شناسه نشست معتبر نیست."},400);
+      const rows=await db.prepare("SELECT id,type,message,reply,status,created_at,replied_at FROM feedback_messages WHERE session_id=? ORDER BY id DESC LIMIT 50").bind(session).all();
+      return json({items:rows.results||[]});
+    }
     if (url.pathname === "/api/ads" && request.method === "GET") {
       const db=getDb(env);
       if (!db) return json({ads:{}});
@@ -361,7 +390,7 @@ export default {
         for (const row of rows.results||[]) {
           try {
             const key=row.setting_key.slice(3), item=JSON.parse(row.setting_value);
-            if (item.enabled && (!item.start || item.start<=today) && (!item.end || item.end>=today)) ads[key]=item;
+            if (key === "home" && item.enabled && (!item.start || item.start<=today) && (!item.end || item.end>=today)) ads.home=item;
           } catch {}
         }
         return json({ads});
