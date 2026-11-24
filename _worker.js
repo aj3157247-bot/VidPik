@@ -5,7 +5,7 @@
  */
 const API_BASE = "https://www.aparat.com/api/fa/v1/video/video/show/videohash/";
 const ALLOWED_PAGE_HOSTS = new Set(["aparat.com", "www.aparat.com", "m.aparat.com"]);
-const ALLOWED_MEDIA_HOST_RE = /(^|\.)(asset|cdn)\.aparat\.(com|ir)$/i;
+const ALLOWED_MEDIA_HOST_RE = /\.aparat\.(com|ir)$/i;
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
@@ -32,8 +32,17 @@ function getVideoId(raw) {
 function safeMediaUrl(raw) {
   try {
     const u = new URL(raw);
-    return u.protocol === "https:" && ALLOWED_MEDIA_HOST_RE.test(u.hostname.toLowerCase());
+    const host = u.hostname.toLowerCase();
+    return u.protocol === "https:" && ALLOWED_MEDIA_HOST_RE.test(host) && host !== "www.aparat.com" && host !== "m.aparat.com";
   } catch { return false; }
+}
+function normalizePlaybackSources(attrs, downloads) {
+  const sources = [...downloads];
+  const hls = attrs && (attrs.hls_link || attrs.hls_url || attrs.hls);
+  if (typeof hls === "string" && safeMediaUrl(hls) && !sources.some(x => x.url === hls)) {
+    sources.push({ quality: "پخش آنلاین", url: hls, type: "application/vnd.apple.mpegurl" });
+  }
+  return sources;
 }
 function normalizeDownloads(attrs) {
   const candidates = [];
@@ -100,9 +109,6 @@ async function resolveAparat(raw) {
     } catch (_) {}
   }
 
-  // The embedded Aparat player can still work when its metadata/download API is unavailable.
-  const embedUrl = "https://www.aparat.com/video/video/embed/videohash/" +
-    encodeURIComponent(id) + "/vt/frame";
   if (!attrs) {
     return {
       title: "ویدیوی آپارات",
@@ -111,14 +117,14 @@ async function resolveAparat(raw) {
       downloads: [],
       mediaSources: [],
       downloadAllowed: false,
-      embedUrl,
       warning: lastStatus === 404
-        ? "اطلاعات دانلود از API آپارات دریافت نشد؛ پخش‌کنندهٔ رسمی امتحان می‌شود."
-        : "API دریافت کیفیت‌ها پاسخ نداد؛ پخش‌کنندهٔ رسمی امتحان می‌شود."
+        ? "اطلاعات این ویدیو از API آپارات دریافت نشد."
+        : "API دریافت اطلاعات و کیفیت‌ها پاسخ نداد."
     };
   }
 
   const downloads = normalizeDownloads(attrs);
+  const mediaSources = normalizePlaybackSources(attrs, downloads);
   const title = String(attrs.title || attrs.name || "ویدیوی آپارات").slice(0, 300);
   const uploader = attrs.username || attrs.sender_name || attrs.owner?.name || attrs.uploader?.name || "";
   const thumbnail = attrs.big_poster || attrs.small_poster || attrs.poster || attrs.thumbnail || "";
@@ -132,10 +138,9 @@ async function resolveAparat(raw) {
     uploader: String(uploader).slice(0, 150),
     thumbnail: safeThumbnail,
     downloads,
-    mediaSources: downloads,
+    mediaSources,
     downloadAllowed: downloads.length > 0,
-    embedUrl,
-    warning: downloads.length ? "" : "پخش‌کنندهٔ رسمی در دسترس است، اما لینک دانلود مستقیم از API دریافت نشد."
+    warning: downloads.length ? "" : "برای این ویدیو لینک مستقیم قابل‌دسترسی از API دریافت نشد."
   };
 }
 
