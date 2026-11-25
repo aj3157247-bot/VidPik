@@ -29,23 +29,36 @@ function getVideoId(raw) {
   if (!/^[A-Za-z0-9_-]{3,32}$/.test(id)) throw new Error("فرمت لینک پشتیبانی نمی‌شود. لینک یک ویدیوی آپارات با قالب /v/شناسه وارد کن.");
   return id;
 }
+const MEDIA_HOST_SUFFIXES = ["aparat.com", "aparat.ir", "aparat.cloud", "aparatcdn.com", "aparatcdn.ir"];
+const FETCH_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36";
+const HLS_RE = /\.m3u8(\?|#|$)/i;
+function hostAllowed(host) {
+  host = String(host || "").toLowerCase();
+  return MEDIA_HOST_SUFFIXES.some(sfx => host === sfx || host.endsWith("." + sfx));
+}
 function safeMediaUrl(raw) {
   try {
     const u = new URL(raw);
-    return u.protocol === "https:" && ALLOWED_MEDIA_HOST_RE.test(u.hostname.toLowerCase());
+    return u.protocol === "https:" && hostAllowed(u.hostname);
   } catch { return false; }
 }
 function normalizeDownloads(attrs) {
   const candidates = [];
   const seen = new Set();
   const add = (raw, quality, type) => {
-    if (typeof raw !== "string" || !safeMediaUrl(raw) || seen.has(raw)) return;
+    if (typeof raw !== "string") return;
+    raw = raw.trim().replace(/^http:\/\//i, "https://");
+    if (!safeMediaUrl(raw) || seen.has(raw)) return;
     seen.add(raw);
-    candidates.push({
-      quality: String(quality || "کیفیت موجود").slice(0, 80),
-      url: raw,
-      type: String(type || "").slice(0, 100)
-    });
+    const kind = HLS_RE.test(raw) || /mpegurl/i.test(String(type || "")) ? "hls" : "file";
+    let q = String(quality || "کیفیت موجود").slice(0, 80);
+    if (/^\d{3,4}$/.test(q)) q += "p";
+    if (q.toLowerCase() === "hls") q = "HLS (خودکار)";
+    if (q === "کیفیت موجود") {
+      const guess = raw.match(/(\d{3,4})p(?![a-z])/i);
+      if (guess) q = guess[1] + "p";
+    }
+    candidates.push({ quality: q, url: raw, type: String(type || "").slice(0, 100), kind });
   };
   const walk = (value, fallback = "کیفیت موجود", depth = 0) => {
     if (depth > 6 || value == null) return;
@@ -54,22 +67,114 @@ function normalizeDownloads(attrs) {
     if (typeof value !== "object") return;
     const quality = value.profile || value.quality || value.label || value.resolution || value.height || value.name || fallback;
     const type = value.type || value.mime_type || value.mimeType || "";
-    for (const key of ["url", "src", "file", "link", "file_link", "download_url"]) {
+    for (const key of ["url", "src", "file", "link", "file_link", "download_url", "hls_link", "hlsLink", "hls_url", "hls", "m3u8", "mp4", "video_url"]) {
       if (typeof value[key] === "string") add(value[key], quality, type);
     }
     for (const key of ["urls", "files", "sources", "streams", "items", "links", "qualities"]) {
       if (value[key] != null) walk(value[key], quality, depth + 1);
     }
   };
-  for (const key of ["file_link_all", "file_link", "download_link", "download_links", "multiSRC", "sources", "streams", "qualities", "files"]) {
+  for (const key of ["file_link_all", "file_link", "download_link", "download_links", "multiSRC", "multi_src", "multiSrc", "sources", "streams", "qualities", "files", "hls_link", "hlsLink", "hls", "playlist"]) {
     if (attrs && attrs[key] != null) walk(attrs[key], attrs.profile || "کیفیت موجود");
   }
-  candidates.sort((a, b) => {
-    const ah = Number((String(a.quality).match(/\d{3,4}/) || [0])[0]);
-    const bh = Number((String(b.quality).match(/\d{3,4}/) || [0])[0]);
-    return bh - ah;
+  return candidates.slice(0, 40);
+}
+function qualityNumber(q) {
+  return Number((String(q).match(/\d{3,4}/) || [0])[0]);
+}
+function sortDownloads(list) {
+  return list.sort((a, b) => {
+    const diff = qualityNumber(b.quality) - qualityNumber(a.quality);
+    if (diff) return diff;
+    if (a.kind !== b.kind) return a.kind === "file" ? -1 : 1;
+    return 0;
   });
-  return candidates.slice(0, 30);
+}
+async function fetchPlaylist(url) {
+  const response = await fetch(url, {
+    headers: {
+      "accept": "*/*",
+      "origin": "https://www.aparat.com",
+      "referer": "https://www.aparat.com/",
+      "user-agent": FETCH_UA
+    },
+    redirect: "follow"
+  });
+  if (!response.ok) throw new Error("HTTP " + response.status);
+  const text = await response.text();
+  if (!text.includes("#EXTM3U")) throw new Error("not-a-playlist");
+  return { text, url: response.url || url };
+}
+// Expands an HLS master playlist into one entry per quality (e.g. 1080p / 720p / 480p).
+async function expandHls(items) {
+  const out = [];
+  const masters = [];
+  const seen = new Set();
+  const push = item => { if (!seen.has(item.url)) { seen.add(item.url); out.push(item); } };
+  for (const item of items) {
+    if (item.kind !== "hls") { push(item); continue; }
+    try {
+      const { text, url } = await fetchPlaylist(item.url);
+      if (!/#EXT-X-STREAM-INF/.test(text)) { push(item); masters.push(item); continue; }
+      masters.push({ ...item, quality: "خودکار", url: item.url });
+      const lines = text.split(/\r?\n/);
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line.startsWith("#EXT-X-STREAM-INF")) continue;
+        let next = "";
+        for (let j = i + 1; j < lines.length; j++) {
+          const candidate = lines[j].trim();
+          if (candidate && !candidate.startsWith("#")) { next = candidate; break; }
+        }
+        if (!next) continue;
+        const res = line.match(/RESOLUTION=(\d+)x(\d+)/i) || [];
+        const bw = Number((line.match(/BANDWIDTH=(\d+)/i) || [])[1] || 0);
+        const h = Number(res[2] || 0);
+        let abs = "";
+        try { const u = new URL(next, url); if (u.protocol === "http:") u.protocol = "https:"; abs = u.href; } catch { continue; }
+        if (!safeMediaUrl(abs)) continue;
+        push({
+          quality: (h ? h + "p" : (bw ? Math.round(bw / 1000) + "kbps" : "HLS")) + " · HLS",
+          url: abs,
+          type: "application/vnd.apple.mpegurl",
+          kind: "hls"
+        });
+      }
+    } catch (_) { push(item); masters.push(item); }
+  }
+  return { downloads: out, masters };
+}
+// Fallback when Aparat's JSON API refuses us: read media URLs out of the public page / embed player HTML.
+async function scrapeAparat(id) {
+  const pages = [
+    "https://www.aparat.com/v/" + encodeURIComponent(id),
+    "https://www.aparat.com/video/video/embed/videohash/" + encodeURIComponent(id) + "/vt/frame"
+  ];
+  const found = [];
+  let title = "";
+  for (const page of pages) {
+    try {
+      const response = await fetch(page, {
+        headers: {
+          "accept": "text/html,application/xhtml+xml,*/*;q=0.8",
+          "accept-language": "fa-IR,fa;q=0.9,en;q=0.8",
+          "referer": "https://www.aparat.com/",
+          "user-agent": FETCH_UA
+        },
+        redirect: "follow"
+      });
+      if (!response.ok) continue;
+      let html = await response.text();
+      html = html.replace(/\\u002[Ff]/g, "/").replace(/\\\//g, "/").replace(/&amp;/g, "&");
+      if (!title) {
+        const m = html.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)/i) || html.match(/<title>([^<]+)/i);
+        if (m) title = m[1].replace(/\s*[|\-–]\s*آپارات.*$/, "").trim();
+      }
+      const re = /https?:\/\/[^"'\s<>\\]+?\.(?:m3u8|mp4)(?:\?[^"'\s<>\\]*)?/gi;
+      for (const m of html.matchAll(re)) found.push(m[0]);
+    } catch (_) {}
+  }
+  return { title, urls: [...new Set(found)] };
 }
 async function resolveAparat(raw) {
   const id = getVideoId(raw);
@@ -78,7 +183,6 @@ async function resolveAparat(raw) {
     "https://www.aparat.com/etc/api/video/videohash/" + encodeURIComponent(id)
   ];
   let attrs = null;
-  let lastStatus = 0;
   for (const endpoint of endpoints) {
     try {
       const response = await fetch(endpoint, {
@@ -87,56 +191,71 @@ async function resolveAparat(raw) {
           "accept-language": "fa-IR,fa;q=0.9,en;q=0.8",
           "origin": "https://www.aparat.com",
           "referer": "https://www.aparat.com/",
-          "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
+          "user-agent": FETCH_UA
         },
         redirect: "follow"
       });
-      lastStatus = response.status;
       if (!response.ok) continue;
       const body = await response.json().catch(() => null);
       attrs = body?.data?.attributes || body?.data || body?.attributes ||
         body?.video?.attributes || body?.video || null;
-      if (attrs && typeof attrs === "object") break;
+      if (attrs && typeof attrs === "object") {
+        // Skip responses that carry metadata but no usable media; the next endpoint may have it.
+        if (normalizeDownloads(attrs).length) break;
+      } else { attrs = null; }
     } catch (_) {}
   }
-
-  // The embedded Aparat player can still work when its metadata/download API is unavailable.
   const embedUrl = "https://www.aparat.com/video/video/embed/videohash/" +
     encodeURIComponent(id) + "/vt/frame";
-  if (!attrs) {
-    return {
-      title: "ویدیوی آپارات",
-      uploader: "",
-      thumbnail: "",
-      downloads: [],
-      mediaSources: [],
-      downloadAllowed: false,
-      embedUrl,
-      warning: lastStatus === 404
-        ? "اطلاعات دانلود از API آپارات دریافت نشد؛ پخش‌کنندهٔ رسمی امتحان می‌شود."
-        : "API دریافت کیفیت‌ها پاسخ نداد؛ پخش‌کنندهٔ رسمی امتحان می‌شود."
-    };
+
+  let downloads = attrs ? normalizeDownloads(attrs) : [];
+  let scrapedTitle = "";
+  if (!downloads.length) {
+    const scraped = await scrapeAparat(id);
+    scrapedTitle = scraped.title;
+    downloads = normalizeDownloads({ sources: scraped.urls });
+  }
+  const expanded = await expandHls(downloads);
+  downloads = sortDownloads(expanded.downloads);
+  const mediaSources = [];
+  const seenSrc = new Set();
+  for (const item of [...expanded.masters, ...downloads]) {
+    if (!seenSrc.has(item.url)) { seenSrc.add(item.url); mediaSources.push(item); }
   }
 
-  const downloads = normalizeDownloads(attrs);
-  const title = String(attrs.title || attrs.name || "ویدیوی آپارات").slice(0, 300);
-  const uploader = attrs.username || attrs.sender_name || attrs.owner?.name || attrs.uploader?.name || "";
-  const thumbnail = attrs.big_poster || attrs.small_poster || attrs.poster || attrs.thumbnail || "";
+  const title = String((attrs && (attrs.title || attrs.name)) || scrapedTitle || "ویدیوی آپارات").slice(0, 300);
+  const uploader = attrs ? (attrs.username || attrs.sender_name || attrs.owner?.name || attrs.uploader?.name || "") : "";
+  const thumbnail = attrs ? (attrs.big_poster || attrs.small_poster || attrs.poster || attrs.thumbnail || "") : "";
   let safeThumbnail = "";
   try {
     const t = new URL(thumbnail);
-    if (t.protocol === "https:" && /(^|\.)asset\.aparat\.com$/i.test(t.hostname)) safeThumbnail = t.href;
+    if (t.protocol === "https:" && hostAllowed(t.hostname)) safeThumbnail = t.href;
   } catch {}
   return {
     title,
     uploader: String(uploader).slice(0, 150),
     thumbnail: safeThumbnail,
     downloads,
-    mediaSources: downloads,
+    mediaSources,
     downloadAllowed: downloads.length > 0,
     embedUrl,
-    warning: downloads.length ? "" : "پخش‌کنندهٔ رسمی در دسترس است، اما لینک دانلود مستقیم از API دریافت نشد."
+    warning: downloads.length ? "" : "پخش‌کنندهٔ رسمی در دسترس است، اما لینک دانلود مستقیم دریافت نشد."
   };
+}
+function rewritePlaylist(text, baseUrl) {
+  const proxy = ref => {
+    const u = new URL(ref, baseUrl);
+    if (u.protocol === "http:") u.protocol = "https:";
+    return "/api/stream?url=" + encodeURIComponent(u.href);
+  };
+  return text.split(/\r?\n/).map(line => {
+    const t = line.trim();
+    if (!t) return line;
+    try {
+      if (t.startsWith("#")) return line.replace(/URI="([^"]+)"/g, (m, u) => 'URI="' + proxy(u) + '"');
+      return proxy(t);
+    } catch { return line; }
+  }).join("\n");
 }
 
 // ---- VidPik analytics + admin API (Cloudflare D1) ----
@@ -597,7 +716,10 @@ export default {
           method: request.method,
           headers: {
             "accept": "video/*, application/vnd.apple.mpegurl, application/octet-stream;q=0.9, */*;q=0.8",
-            ...(request.headers.has("range") ? { "range": request.headers.get("range") } : {})
+            "origin": "https://www.aparat.com",
+            "referer": "https://www.aparat.com/",
+            "user-agent": FETCH_UA,
+            ...(request.headers.has("range") && !HLS_RE.test(raw) ? { "range": request.headers.get("range") } : {})
           },
           redirect: "follow"
         });
@@ -605,6 +727,20 @@ export default {
         if (!upstream.ok && upstream.status !== 206) return json({ error: "دریافت جریان ویدیو ناموفق بود (HTTP " + upstream.status + ")." }, 502);
         const contentType = (upstream.headers.get("content-type") || "application/octet-stream").toLowerCase();
         if (contentType.includes("text/html") || contentType.includes("application/json")) return json({ error: "منبع به‌جای ویدیو، صفحه وب برگرداند." }, 502);
+        if (/mpegurl/.test(contentType) || HLS_RE.test(upstream.url || raw)) {
+          const playlist = await upstream.text();
+          if (playlist.includes("#EXTM3U")) {
+            return new Response(request.method === "HEAD" ? null : rewritePlaylist(playlist, upstream.url || raw), {
+              status: 200,
+              headers: {
+                "content-type": "application/vnd.apple.mpegurl; charset=utf-8",
+                "cache-control": "no-store",
+                "x-content-type-options": "nosniff"
+              }
+            });
+          }
+          return json({ error: "لیست پخش معتبر نبود." }, 502);
+        }
         const headers = new Headers({
           "content-type": contentType,
           "content-disposition": "inline",
@@ -634,6 +770,9 @@ export default {
           method: request.method,
           headers: {
             "accept": "video/*, application/octet-stream;q=0.9, */*;q=0.8",
+            "origin": "https://www.aparat.com",
+            "referer": "https://www.aparat.com/",
+            "user-agent": FETCH_UA,
             ...(request.headers.has("range") ? { "range": request.headers.get("range") } : {})
           },
           redirect: "follow"
