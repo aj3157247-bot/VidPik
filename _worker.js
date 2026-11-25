@@ -694,6 +694,33 @@ export default {
         return json({ error: "ارتباط با جستجوی آپارات ناموفق بود. اتصال اینترنت را بررسی کن و دوباره تلاش کن." }, 502);
       }
     }
+    // Diagnostics: shows what Aparat returns to this Worker (status codes, content type, short body preview).
+    if (url.pathname === "/api/debug") {
+      let id = "";
+      try { id = getVideoId(url.searchParams.get("url") || ""); } catch (e) { return json({ error: e.message }, 400); }
+      const targets = [
+        API_BASE + id,
+        "https://www.aparat.com/etc/api/video/videohash/" + id,
+        "https://www.aparat.com/v/" + id,
+        "https://www.aparat.com/video/video/embed/videohash/" + id + "/vt/frame"
+      ];
+      const report = [];
+      for (const target of targets) {
+        const row = { url: target };
+        try {
+          const r = await fetch(target, { headers: { "accept": "application/json, text/html;q=0.9, */*;q=0.8", "accept-language": "fa-IR,fa;q=0.9,en;q=0.8", "origin": "https://www.aparat.com", "referer": "https://www.aparat.com/", "user-agent": FETCH_UA }, redirect: "follow" });
+          const text = await r.text();
+          row.status = r.status;
+          row.contentType = r.headers.get("content-type") || "";
+          row.length = text.length;
+          row.preview = text.slice(0, 300);
+          row.mediaUrls = [...new Set((text.replace(/\\u002[Ff]/g, "/").replace(/\\\//g, "/").match(/https?:\/\/[^"'\s<>\\]+?\.(?:m3u8|mp4)[^"'\s<>\\]*/gi)) || [])].slice(0, 5);
+          try { const j = JSON.parse(text); const a = j?.data?.attributes || j?.data || j?.video || {}; row.attributeKeys = Object.keys(a).slice(0, 60); row.canDownload = a.can_download; } catch (_) {}
+        } catch (e) { row.error = String(e && e.message || e); }
+        report.push(row);
+      }
+      return json({ id, colo: request.cf?.colo || "", country: request.cf?.country || "", report });
+    }
     if (url.pathname === "/api/resolve") {
       if (request.method !== "GET") return json({ error: "فقط درخواست GET پذیرفته می‌شود." }, 405);
       const raw = url.searchParams.get("url");
