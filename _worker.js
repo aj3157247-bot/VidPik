@@ -231,6 +231,7 @@ async function resolveAparat(raw) {
     const t = new URL(thumbnail);
     if (t.protocol === "https:" && hostAllowed(t.hostname)) safeThumbnail = t.href;
   } catch {}
+  if (!attrs && !downloads.length && await checkVideo(id) === "missing") return { missing: true };
   return {
     title,
     uploader: String(uploader).slice(0, 150),
@@ -241,6 +242,35 @@ async function resolveAparat(raw) {
     embedUrl,
     warning: downloads.length ? "" : "پخش‌کنندهٔ رسمی در دسترس است، اما لینک دانلود مستقیم دریافت نشد."
   };
+}
+// Returns "ok" | "missing" | "unknown". "unknown" means we could not verify, so callers must NOT hide the video.
+const GENERIC_TITLE_RE = /^\s*آپارات\s*[-–|]\s*سرویس اشتراک ویدیو\s*$/;
+async function checkVideo(id) {
+  const headers = {
+    "accept": "text/html,application/json;q=0.9,*/*;q=0.8",
+    "accept-language": "fa-IR,fa;q=0.9,en;q=0.8",
+    "referer": "https://www.aparat.com/",
+    "user-agent": FETCH_UA
+  };
+  try {
+    const r = await fetch("https://www.aparat.com/v/" + encodeURIComponent(id), { headers, redirect: "follow" });
+    if (r.status === 404 || r.status === 410) return "missing";
+    if (r.ok) {
+      const t = await r.text();
+      if (/صفحه\s*مورد\s*نظر\s*شما\s*پیدا\s*نشد|خطای\s*(404|۴۰۴)/.test(t)) return "missing";
+      const m = t.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)/i) || t.match(/<title>([^<]+)/i);
+      if (m && !GENERIC_TITLE_RE.test(m[1])) return "ok";
+    }
+  } catch (_) {}
+  try {
+    const r = await fetch(API_BASE + encodeURIComponent(id), { headers, redirect: "follow" });
+    if (r.status === 404) return "missing";
+    if (r.ok) {
+      const j = await r.json().catch(() => null);
+      if (j && (j.data || j.video)) return "ok";
+    }
+  } catch (_) {}
+  return "unknown";
 }
 function rewritePlaylist(text, baseUrl) {
   const proxy = ref => {
@@ -721,6 +751,11 @@ export default {
       }
       return json({ id, colo: request.cf?.colo || "", country: request.cf?.country || "", report });
     }
+    if (url.pathname === "/api/check") {
+      const ids = (url.searchParams.get("ids") || "").split(",").map(x => x.trim()).filter(x => /^[A-Za-z0-9_-]{3,32}$/.test(x)).slice(0, 8);
+      const entries = await Promise.all(ids.map(async id => [id, await checkVideo(id)]));
+      return json({ results: Object.fromEntries(entries) });
+    }
     if (url.pathname === "/api/resolve") {
       if (request.method !== "GET") return json({ error: "فقط درخواست GET پذیرفته می‌شود." }, 405);
       const raw = url.searchParams.get("url");
@@ -728,6 +763,7 @@ export default {
       await recordEvent(env,"resolve",request);
       try {
         const result = await resolveAparat(raw);
+        if (result.missing) return json({ error: "این ویدیو در آپارات وجود ندارد (خطای ۴۰۴)؛ ممکن است حذف شده، خصوصی شده یا لینک اشتباه باشد. در خود آپارات هم باز نمی‌شود.", missing: true }, 404);
         return json(result);
       } catch (error) {
         return json({ error: error instanceof Error ? error.message : "خطای نامشخص." }, 400);
